@@ -1,0 +1,42 @@
+name: Bug Report
+description: Report a reproducible bug in MiniMem
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What happened and what did you expect?
+      placeholder: A clear and concise bug summary.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: Include exact steps and sample input.
+      placeholder: |
+        1. Start app with ...
+        2. Open page ...
+        3. Submit ...
+        4. Observe ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: env
+    attributes:
+      label: Environment
+      description: OS, Python version, and runtime provider config.
+      placeholder: Windows 11, Python 3.11, chat provider ..., embedding provider ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or Screenshots
+      description: Paste logs or attach screenshots if available.
+      placeholder: Optional but strongly recommended.

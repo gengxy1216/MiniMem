@@ -1,0 +1,20 @@
+name: Question
+description: Ask a usage or design question about MiniMem
+title: "[Question] "
+labels: ["question"]
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+      description: What do you want to know?
+      placeholder: Please provide context and expected outcome.
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Your setup, API call, UI action, or logs.
+      placeholder: Optional but helpful.

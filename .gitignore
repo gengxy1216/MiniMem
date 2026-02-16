@@ -1,0 +1,25 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+.env
+MiniMem_data/
+.evermemos-lite-data/
+*.db
+*.kuzu
+
+# Local research / operation planning docs
+docs/github-growth-checklist.md
+docs/OPEN_SOURCE_PLAYBOOK.md
+docs/RELEASING.md
+everMemOs.pdf
+tmp_paper.txt
+
+# Local test workspace (exclude from open-source publish)
+tests/
+

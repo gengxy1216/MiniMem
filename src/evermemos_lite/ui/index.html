@@ -1,0 +1,2991 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MiniMem Console</title>
+  <style>
+    :root{
+      --bg:#ffffff;
+      --surface:#ffffff;
+      --surface-soft:#f8fafc;
+      --sidebar:#f7f7f8;
+      --line:#eceff3;
+      --line-strong:#d1d5db;
+      --text:#111827;
+      --muted:#6b7280;
+      --ok:#059669;
+      --danger:#dc2626;
+      --primary:#10a37f;
+      --primary-2:#0e9273;
+      --ring:#0ea5e9;
+      --radius:14px;
+      --z-top:30;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      background:var(--bg);
+      color:var(--text);
+      font:14px/1.55 "Soehne","Noto Sans SC","PingFang SC","Segoe UI","Helvetica Neue",Arial,sans-serif;
+      -webkit-font-smoothing:antialiased;
+      text-rendering:optimizeLegibility;
+    }
+    .hidden{display:none !important}
+    .skip-link{
+      position:absolute;
+      left:-9999px;
+      top:8px;
+      z-index:var(--z-top);
+      background:#fff;
+      color:var(--text);
+      border:1px solid var(--line-strong);
+      border-radius:10px;
+      padding:8px 10px;
+    }
+    .skip-link:focus{left:8px}
+    .card{border:1px solid var(--line);background:var(--surface);border-radius:var(--radius)}
+    input,textarea,select,button{
+      font:inherit;
+      color:var(--text);
+      background:#fff;
+      border:1px solid var(--line-strong);
+      border-radius:10px;
+      min-height:44px;
+      padding:10px 12px;
+    }
+    textarea{min-height:110px;max-height:360px;resize:vertical}
+    button{
+      cursor:pointer;
+      transition:background-color .2s ease,border-color .2s ease,color .2s ease,opacity .2s ease,transform .2s ease;
+      touch-action:manipulation;
+      -webkit-tap-highlight-color:rgba(16,163,127,.18);
+    }
+    button:hover{background:#fafafa;border-color:#c4c9d1}
+    button.primary{background:var(--primary);border-color:var(--primary);color:#fff}
+    button.primary:hover{background:var(--primary-2);border-color:var(--primary-2)}
+    button.danger{background:#fff5f5;border-color:#fecaca;color:#991b1b}
+    button[disabled]{cursor:not-allowed;opacity:.65}
+    input:focus-visible,textarea:focus-visible,select:focus-visible,button:focus-visible{
+      outline:2px solid var(--ring);
+      outline-offset:2px;
+    }
+    .muted{color:var(--muted)}
+    .ok{color:var(--ok)}
+    .err{color:var(--danger)}
+    .label{
+      display:block;
+      font-size:12px;
+      line-height:1.2;
+      letter-spacing:.04em;
+      text-transform:uppercase;
+      color:var(--muted);
+      margin-bottom:5px;
+    }
+    .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+    .action-grid{
+      display:grid;
+      grid-template-columns:repeat(3,minmax(0,1fr));
+      gap:10px;
+    }
+    .action-grid button{width:100%}
+    .input-lg{min-height:120px}
+    .input-xl{min-height:180px}
+    .grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+    .tiny{font-size:12px;color:var(--muted)}
+    .out{
+      border:0;
+      border-left:2px solid var(--line);
+      border-radius:0;
+      padding:8px 10px;
+      background:transparent;
+      font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+      white-space:pre-wrap;
+      overflow-wrap:anywhere;
+      min-height:90px;
+      max-height:300px;
+      overflow:auto;
+    }
+
+    #login_view{
+      min-height:100vh;
+      display:grid;
+      place-items:center;
+      padding:20px;
+      animation:fade-up .24s ease;
+    }
+    .login-card{width:min(460px,100%);padding:24px}
+    .login-card h1{
+      margin:0 0 8px;
+      font-size:clamp(28px,4vw,36px);
+      line-height:1.16;
+      letter-spacing:-.02em;
+      font-weight:630;
+    }
+
+    .app-shell{
+      min-height:100vh;
+      display:grid;
+      grid-template-columns:260px 1fr;
+      align-items:start;
+    }
+    .sidebar{
+      position:sticky;
+      top:0;
+      height:100vh;
+      min-height:100vh;
+      align-self:start;
+      border-right:1px solid var(--line);
+      background:var(--sidebar);
+      padding:10px 8px;
+      display:grid;
+      grid-template-rows:auto auto auto auto minmax(0,1fr);
+      gap:4px;
+      overflow:hidden;
+    }
+    .brand{display:flex;justify-content:space-between;align-items:center;gap:8px}
+    .brand h2{margin:0;font-size:16px;font-weight:620;letter-spacing:.01em}
+    .dot{width:9px;height:9px;border-radius:999px;background:var(--primary);display:inline-block}
+    .whoami{
+      padding:8px 2px;
+      border:0;
+      border-radius:0;
+      background:transparent;
+      font-size:13px;
+      color:var(--muted);
+      display:grid;
+      gap:4px;
+    }
+    .nav{display:grid;gap:2px}
+    .nav button{
+      width:100%;
+      text-align:left;
+      display:inline-flex;
+      align-items:center;
+      justify-content:flex-start;
+      gap:8px;
+    }
+    .nav button.active{
+      background:#eef3f8;
+      border-color:#dde4ec;
+      color:#0f172a;
+    }
+    .sessions{
+      border:0;
+      border-radius:0;
+      background:transparent;
+      display:grid;
+      grid-template-rows:auto 1fr;
+      min-height:200px;
+      overflow:hidden;
+    }
+    .sessions h3{
+      margin:0;
+      padding:8px 2px;
+      border-bottom:0;
+      font-size:12px;
+      letter-spacing:.06em;
+      text-transform:uppercase;
+      color:var(--muted);
+      background:transparent;
+    }
+    .session-list{
+      margin:0;
+      padding:2px;
+      list-style:none;
+      display:grid;
+      gap:2px;
+      height:100%;
+      overflow:auto;
+    }
+    .session-item{
+      border:1px solid transparent;
+      border-radius:8px;
+      background:transparent;
+      padding:9px 10px;
+      cursor:pointer;
+      transition:background-color .2s ease,border-color .2s ease;
+    }
+    .session-item:hover{background:#f2f4f7}
+    .session-item.active{border-color:#e3e8ef;background:#eceff3}
+    .sidebar button{
+      border:0;
+      background:transparent;
+      min-height:30px;
+      padding:6px 8px;
+      box-shadow:none;
+    }
+    .sidebar button:hover{
+      background:#f2f5f8;
+      border-color:transparent;
+    }
+    #btn_logout{
+      min-height:30px;
+      padding:6px 8px;
+      color:var(--muted);
+    }
+    #btn_new_session{
+      text-align:left;
+      color:#0f172a;
+      font-weight:560;
+      background:transparent;
+      border:1px dashed var(--line);
+      border-radius:7px;
+    }
+    #btn_new_session:hover{
+      background:#f7f9fb;
+      border-color:#d8dee6;
+    }
+    .session-item-title{
+      margin:0;
+      font-weight:500;
+      font-size:13px;
+      line-height:1.4;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+    .session-item-meta{
+      display:flex;
+      justify-content:space-between;
+      gap:8px;
+      margin-top:3px;
+      font-size:11px;
+      color:var(--muted);
+    }
+    .session-provider{
+      text-transform:uppercase;
+      letter-spacing:.04em;
+    }
+    .badge{
+      border:1px solid #cbd5e1;
+      background:#f8fafc;
+      color:#334155;
+      border-radius:999px;
+      padding:1px 8px;
+      font-size:11px;
+      line-height:1.5;
+    }
+    .badge-score{
+      border-color:#bfdbfe;
+      background:#eff6ff;
+      color:#1d4ed8;
+    }
+    .memory-list{
+      border:0;
+      border-radius:0;
+      background:transparent;
+      padding:0;
+      display:grid;
+      gap:6px;
+      max-height:420px;
+      overflow:auto;
+    }
+    .memory-item{
+      border:1px solid var(--line);
+      border-radius:10px;
+      padding:10px;
+      background:transparent;
+      display:grid;
+      gap:7px;
+    }
+    .memory-item h4{
+      margin:0;
+      font-size:14px;
+      line-height:1.4;
+      font-weight:600;
+    }
+    .memory-item p{
+      margin:0;
+      color:var(--muted);
+      font-size:13px;
+      line-height:1.55;
+      white-space:pre-wrap;
+    }
+    .form-sheet{
+      border:1px solid var(--line);
+      border-radius:10px;
+      background:transparent;
+      padding:10px;
+      display:grid;
+      gap:10px;
+    }
+    .form-sheet h4{
+      margin:0;
+      font-size:14px;
+      font-weight:620;
+    }
+    .kv-list{
+      display:grid;
+      gap:8px;
+    }
+    .kv-item{
+      border:0;
+      border-bottom:1px dashed var(--line);
+      border-radius:0;
+      padding:6px 0;
+      background:transparent;
+      display:grid;
+      grid-template-columns:minmax(110px,160px) 1fr;
+      gap:8px;
+      align-items:start;
+    }
+    .kv-item dt{
+      margin:0;
+      font-size:11px;
+      color:var(--muted);
+      letter-spacing:.04em;
+      text-transform:uppercase;
+    }
+    .kv-item dd{
+      margin:0;
+      font-size:13px;
+      line-height:1.5;
+      overflow-wrap:anywhere;
+    }
+    .slice-list{
+      display:grid;
+      gap:8px;
+    }
+    .slice-item{
+      border:1px dashed var(--line);
+      border-radius:8px;
+      padding:8px 10px;
+      background:transparent;
+      font-size:13px;
+      line-height:1.55;
+      white-space:pre-wrap;
+      overflow-wrap:anywhere;
+    }
+    .manage-toolbar{
+      border:0;
+      border-radius:0;
+      background:transparent;
+      padding:0;
+      display:grid;
+      gap:8px;
+    }
+    .manage-toolbar textarea{
+      min-height:110px;
+      max-height:220px;
+    }
+    .manage-controls{
+      display:grid;
+      grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:10px;
+    }
+    .manage-actions{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+      align-items:center;
+    }
+    .manage-fetch-wrap{
+      display:flex;
+      justify-content:flex-start;
+    }
+    .ingest-panel{
+      display:grid;
+      gap:12px;
+    }
+    .ingest-panel textarea{
+      min-height:240px;
+      max-height:420px;
+    }
+    .memory-actions{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:8px;
+      flex-wrap:wrap;
+    }
+    .memory-meta{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+      align-items:center;
+    }
+    .dense-table-wrap{
+      width:100%;
+      overflow:auto;
+      border:1px solid var(--line);
+      border-radius:8px;
+      background:#fff;
+    }
+    .dense-table{
+      width:100%;
+      border-collapse:collapse;
+      min-width:980px;
+      font-size:12px;
+      line-height:1.35;
+    }
+    .dense-table th,.dense-table td{
+      padding:7px 8px;
+      border-bottom:1px solid var(--line);
+      vertical-align:top;
+      white-space:nowrap;
+    }
+    .dense-table th{
+      position:sticky;
+      top:0;
+      background:#f8fafc;
+      z-index:1;
+      color:var(--muted);
+      font-weight:600;
+      text-transform:uppercase;
+      letter-spacing:.03em;
+      font-size:11px;
+    }
+    .dense-table td.summary{
+      min-width:360px;
+      max-width:560px;
+      white-space:normal;
+      overflow-wrap:anywhere;
+    }
+    .dense-table td.mono{
+      font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+      font-size:11px;
+    }
+    .dense-table tr:hover{
+      background:#f9fafb;
+    }
+    .dense-action{
+      min-height:28px;
+      padding:4px 8px;
+      font-size:12px;
+      border-radius:7px;
+    }
+    .config-layout{
+      display:grid;
+      gap:10px;
+    }
+    .config-panel{
+      border:1px solid var(--line);
+      border-radius:8px;
+      padding:10px;
+      background:#fff;
+      display:grid;
+      gap:8px;
+    }
+    .config-panel h4{
+      margin:0;
+      font-size:13px;
+      color:#0f172a;
+    }
+    .config-grid{
+      display:grid;
+      grid-template-columns:1.2fr 2fr 1.8fr 1.8fr;
+      gap:8px;
+      align-items:end;
+    }
+    .config-status{
+      min-height:20px;
+    }
+    .graph-explorer{
+      display:grid;
+      grid-template-columns:minmax(290px,380px) 1fr;
+      gap:12px;
+      min-height:calc(100vh - 220px);
+    }
+    .graph-query-panel,.graph-viewer{
+      border:0;
+      border-radius:0;
+      background:transparent;
+      min-width:0;
+    }
+    .graph-query-panel{
+      padding:0 10px 0 0;
+      display:grid;
+      gap:10px;
+      align-content:start;
+    }
+    .graph-query-panel textarea{
+      min-height:220px;
+      max-height:420px;
+      font:13px/1.6 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    }
+    .graph-viewer{
+      display:grid;
+      grid-template-rows:auto auto 1fr;
+      overflow:hidden;
+      border-left:1px solid var(--line);
+      padding-left:12px;
+    }
+    .graph-head{
+      border-bottom:0;
+      padding:2px 0 8px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:8px;
+      flex-wrap:wrap;
+    }
+    .graph-tabs{
+      display:flex;
+      gap:8px;
+      padding:0 0 8px;
+      border-bottom:1px solid var(--line);
+      flex-wrap:wrap;
+    }
+    .graph-tab{
+      min-height:36px;
+      padding:8px 12px;
+      border-radius:999px;
+    }
+    .graph-tab.active{
+      background:#ecfeff;
+      border-color:#a5f3fc;
+      color:#0f766e;
+    }
+    .graph-view{
+      min-height:0;
+      overflow:auto;
+      padding:8px 0 0;
+      display:grid;
+      gap:12px;
+    }
+    .graph-canvas{
+      display:grid;
+      grid-template-columns:minmax(0,1fr) minmax(260px,320px);
+      gap:10px;
+      min-height:560px;
+    }
+    .graph-stage{
+      border:1px solid var(--line);
+      border-radius:12px;
+      background:#ffffff;
+      min-height:560px;
+      overflow:hidden;
+      display:grid;
+      grid-template-rows:auto 1fr;
+      min-width:0;
+      position:relative;
+    }
+    .graph-stage-top{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:8px;
+      padding:8px 10px;
+      border-bottom:1px solid var(--line);
+      background:#fcfdff;
+    }
+    .graph-legend{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      flex-wrap:wrap;
+    }
+    .legend-dot{
+      width:10px;
+      height:10px;
+      border-radius:999px;
+      display:inline-block;
+      vertical-align:middle;
+      margin-right:5px;
+    }
+    .legend-dot.subject{background:#2563eb}
+    .legend-dot.object{background:#0ea5e9}
+    .legend-dot.edge{background:#94a3b8}
+    .graph-stage-meta{
+      font-size:12px;
+      color:var(--muted);
+      white-space:nowrap;
+    }
+    .graph-stage-actions{
+      display:flex;
+      align-items:center;
+      gap:6px;
+      margin-left:10px;
+    }
+    .graph-tool-btn{
+      min-height:26px;
+      min-width:26px;
+      border:1px solid #d8e0ea;
+      border-radius:8px;
+      background:#fff;
+      color:#0f172a;
+      padding:0 7px;
+      font-size:12px;
+      line-height:1;
+    }
+    .graph-tool-btn:hover{
+      background:#f8fafc;
+      border-color:#bfccd9;
+    }
+    #graph_svg{
+      width:100%;
+      height:100%;
+      min-height:500px;
+      display:block;
+      background:#fbfdff;
+      cursor:grab;
+    }
+    .graph-empty{
+      position:absolute;
+      inset:52px 0 0 0;
+      display:grid;
+      place-items:center;
+      color:var(--muted);
+      font-size:13px;
+      pointer-events:none;
+    }
+    .graph-link{
+      fill:none;
+      stroke:#a8b4c5;
+      stroke-width:1.4;
+      opacity:.88;
+      transition:stroke .2s ease,stroke-width .2s ease,opacity .2s ease;
+      cursor:pointer;
+    }
+    .graph-link.active{
+      stroke:#0ea5e9;
+      stroke-width:2.1;
+      opacity:1;
+    }
+    .graph-link.muted{opacity:.24}
+    .graph-link-label{
+      fill:#475569;
+      font-size:11px;
+      pointer-events:none;
+      user-select:none;
+      paint-order:stroke;
+      stroke:#ffffff;
+      stroke-width:3px;
+      stroke-linejoin:round;
+    }
+    .graph-node circle{
+      fill:#eaf2ff;
+      stroke:#93c5fd;
+      stroke-width:1.2;
+      transition:fill .2s ease,stroke .2s ease,stroke-width .2s ease;
+      cursor:pointer;
+    }
+    .graph-node text{
+      fill:#0f172a;
+      font-size:12px;
+      user-select:none;
+      pointer-events:none;
+    }
+    .graph-node.active circle{
+      fill:#dbeafe;
+      stroke:#2563eb;
+      stroke-width:2;
+    }
+    .graph-node.neighbor circle{
+      fill:#ecfeff;
+      stroke:#06b6d4;
+    }
+    .graph-node.root circle{
+      fill:#e0e7ff;
+      stroke:#4f46e5;
+    }
+    .graph-side{
+      border:1px solid var(--line);
+      border-radius:12px;
+      background:#fff;
+      padding:9px;
+      min-width:0;
+      display:grid;
+      grid-template-rows:auto auto minmax(120px,1fr) auto minmax(120px,1fr);
+      gap:9px;
+      overflow:hidden;
+    }
+    .graph-side h4{
+      margin:0;
+      font-size:13px;
+      letter-spacing:.03em;
+      text-transform:uppercase;
+      color:var(--muted);
+    }
+    .graph-list{
+      display:grid;
+      gap:6px;
+      max-height:100%;
+      overflow:auto;
+    }
+    .node-pill{
+      width:100%;
+      text-align:left;
+      border:1px solid #e5e7eb;
+      background:#fff;
+      color:#0f172a;
+      border-radius:8px;
+      min-height:34px;
+      padding:6px 9px;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+    .node-pill.active{
+      background:#ecfeff;
+      border-color:#67e8f9;
+      color:#155e75;
+    }
+    .edge-item{
+      border:1px solid var(--line);
+      border-radius:8px;
+      background:#fff;
+      padding:7px 9px;
+      display:grid;
+      gap:3px;
+      cursor:pointer;
+    }
+    .edge-item.active{
+      border-color:#99f6e4;
+      background:#f0fdfa;
+    }
+    .edge-main{
+      font-size:12px;
+      overflow-wrap:anywhere;
+    }
+    .graph-kv{
+      display:grid;
+      gap:6px;
+      align-content:start;
+      overflow:auto;
+    }
+    .graph-kv .kv-item{
+      background:transparent;
+    }
+    .graph-table{
+      width:100%;
+      border-collapse:collapse;
+      font-size:13px;
+    }
+    .graph-table th,.graph-table td{
+      border-bottom:1px solid var(--line);
+      text-align:left;
+      padding:8px 10px;
+      vertical-align:top;
+      overflow-wrap:anywhere;
+    }
+    .graph-table th{
+      position:sticky;
+      top:0;
+      background:#f8fafc;
+      z-index:2;
+      font-size:12px;
+      color:var(--muted);
+      text-transform:uppercase;
+      letter-spacing:.03em;
+    }
+    .examples{
+      display:grid;
+      gap:8px;
+    }
+    .example-btn{
+      text-align:left;
+      border-radius:8px;
+      min-height:38px;
+      padding:8px 10px;
+      background:transparent;
+      border:1px solid var(--line);
+      font-size:12px;
+      line-height:1.5;
+    }
+    .example-btn:hover{
+      background:#f7f9fb;
+    }
+
+    .main{
+      min-width:0;
+      padding:10px 12px 12px;
+      display:grid;
+      grid-template-rows:auto 1fr;
+      gap:8px;
+      animation:fade-up .24s ease;
+    }
+    .topbar{
+      border:0;
+      border-radius:0;
+      background:transparent;
+      padding:4px 2px;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:10px;
+    }
+    .topbar h3{margin:0;font-size:16px;font-weight:620}
+    .topbar small{display:block;color:var(--muted)}
+
+    .workspace{min-height:0}
+    .page{
+      border:0;
+      border-radius:0;
+      background:transparent;
+      overflow:hidden;
+      min-height:0;
+    }
+    .page-body{padding:2px 2px 8px;display:grid;gap:10px}
+    [data-page="ingest"] .page-body,
+    [data-page="manage"] .page-body,
+    [data-page="config"] .page-body{
+      width:min(980px,100%);
+      margin:0 auto;
+    }
+    [data-page="ingest"] textarea,
+    [data-page="manage"] textarea,
+    [data-page="manage"] select,
+    [data-page="manage"] input{
+      width:100%;
+    }
+
+    .chat-layout{
+      display:grid;
+      grid-template-rows:1fr auto;
+      min-height:calc(100vh - 144px);
+      background:transparent;
+    }
+    .chat-log{
+      padding:22px 0 18px;
+      overflow:auto;
+      display:grid;
+      gap:18px;
+      align-content:start;
+    }
+    .msg{display:grid;gap:7px;width:min(860px,94%);justify-self:center}
+    .msg.user{justify-self:center}
+    .msg.assistant{justify-self:center}
+    .msg-role{
+      font-size:11px;
+      letter-spacing:.05em;
+      text-transform:uppercase;
+      color:var(--muted);
+    }
+    .msg-meta{font-size:12px;color:var(--muted)}
+    .bubble{
+      padding:12px 14px;
+      border:1px solid var(--line);
+      border-radius:14px;
+      background:#fff;
+      white-space:pre-wrap;
+      overflow-wrap:anywhere;
+      line-height:1.62;
+      font-size:14px;
+    }
+    .msg.user .bubble{margin-left:auto;background:#f0f6ff;border-color:#d6e4ff}
+    .msg.user .msg-role{text-align:right}
+    .citations{
+      border:1px dashed var(--line-strong);
+      border-radius:10px;
+      padding:8px;
+      background:#fafafa;
+      color:var(--text);
+      display:grid;
+      gap:8px;
+    }
+    .citations-toggle{
+      border:1px solid var(--line);
+      background:#fff;
+      border-radius:8px;
+      min-height:30px;
+      padding:5px 10px;
+      text-align:left;
+      font-size:12px;
+      color:#334155;
+    }
+    .citations-toggle:hover{background:#f8fafc}
+    .citations-panel{
+      display:grid;
+      gap:6px;
+      max-height:260px;
+      overflow:auto;
+      padding-right:2px;
+    }
+    .citation-item{
+      border:1px solid var(--line);
+      border-radius:8px;
+      background:#fff;
+      padding:6px 8px;
+      display:grid;
+      gap:4px;
+    }
+    .citation-item-main{
+      font-size:12px;
+      color:#0f172a;
+      line-height:1.45;
+      overflow-wrap:anywhere;
+    }
+    .citation-item-meta{
+      font-size:11px;
+      color:var(--muted);
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+    }
+
+    .composer{
+      position:sticky;
+      bottom:0;
+      border-top:1px solid var(--line);
+      background:linear-gradient(180deg,rgba(255,255,255,.93),#fff 16%);
+      padding:12px 0 8px;
+      display:grid;
+      gap:10px;
+    }
+    .composer > *{
+      width:min(860px,94%);
+      margin:0 auto;
+    }
+    .composer textarea{
+      min-height:92px;
+      max-height:220px;
+      border-radius:14px;
+    }
+    .composer-actions{
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-end;
+      gap:8px;
+      flex-wrap:wrap;
+    }
+    .composer-left,.composer-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    #chat_provider{min-width:130px}
+    #chat_top_k{width:88px}
+
+    @keyframes fade-up{
+      from{opacity:0;transform:translateY(8px)}
+      to{opacity:1;transform:translateY(0)}
+    }
+    @media (max-width:1080px){
+      .app-shell{grid-template-columns:220px 1fr}
+      .sidebar{justify-items:stretch}
+      .nav button{width:100%;justify-content:flex-start}
+    }
+    @media (max-width:820px){
+      body{font-size:16px}
+      .app-shell{grid-template-columns:1fr}
+      .sidebar{
+        position:static;
+        height:auto;
+        min-height:auto;
+        align-self:stretch;
+        overflow:visible;
+        border-right:0;
+        border-bottom:1px solid var(--line);
+        grid-template-rows:auto auto auto;
+      }
+      .nav{grid-template-columns:repeat(3,minmax(0,1fr))}
+      .main{padding:10px}
+      .chat-layout{min-height:calc(100vh - 300px)}
+      .action-grid{grid-template-columns:1fr}
+      .grid2,.grid3{grid-template-columns:1fr}
+      .manage-controls{grid-template-columns:1fr}
+      .kv-item{grid-template-columns:1fr}
+      .graph-explorer{grid-template-columns:1fr}
+      .graph-canvas{grid-template-columns:1fr}
+      .graph-viewer{border-left:0;padding-left:0}
+      .config-grid{grid-template-columns:1fr}
+    }
+    @media (prefers-reduced-motion:reduce){
+      *,*::before,*::after{
+        transition:none !important;
+        animation:none !important;
+        scroll-behavior:auto !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <a href="#main_content" class="skip-link">跳到主内容</a>
+
+  <section id="login_view">
+    <div class="card login-card">
+      <h1>MiniMem Console</h1>
+      <div class="muted" style="margin-bottom:14px">先登录，再进入完整工作台。</div>
+      <form id="login_form" class="row" style="display:grid;gap:10px" novalidate>
+        <div>
+          <label class="label" for="login_username">用户名</label>
+          <input id="login_username" name="username" autocomplete="username" required />
+        </div>
+        <div>
+          <label class="label" for="login_password">密码</label>
+          <input id="login_password" name="password" type="password" autocomplete="current-password" required />
+        </div>
+        <button id="btn_login" class="primary" type="submit">进入控制台</button>
+      </form>
+      <div class="tiny muted" style="margin-top:10px">默认账号：admin / admin123</div>
+      <div id="login_status" aria-live="polite" style="margin-top:8px"></div>
+    </div>
+  </section>
+
+  <section id="app_view" class="hidden">
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="row" style="gap:8px"><span class="dot" aria-hidden="true"></span><h2>MiniMem</h2></div>
+          <button id="btn_logout" type="button" aria-label="Sign out">Sign out</button>
+        </div>
+        <div class="whoami"><div id="chip_user">user: -</div><div id="chip_group">group: -</div></div>
+        <button id="btn_new_session" class="primary" type="button">New Chat</button>
+        <nav class="nav" aria-label="主导航">
+          <button class="nav-btn active" data-page="chat" data-i18n-key="nav.chat" type="button">Chat</button>
+          <button class="nav-btn" data-page="ingest" data-i18n-key="nav.ingest" type="button">Mem Ingest</button>
+          <button class="nav-btn" data-page="manage" data-i18n-key="nav.manage" type="button">Mem Manage</button>
+          <button class="nav-btn" data-page="graph" data-i18n-key="nav.graph" type="button">Graph</button>
+          <button class="nav-btn" data-page="config" data-i18n-key="nav.config" type="button">Settings</button>
+        </nav>
+        <section class="sessions">
+          <h3 id="sessions_title">Conversations</h3>
+          <ul id="session_list" class="session-list"></ul>
+        </section>
+      </aside>
+
+      <main class="main" id="main_content">
+        <header class="topbar">
+          <div><h3 id="page_title">Chat</h3><small id="page_hint">对话与记忆检索</small></div>
+          <div id="global_status" class="tiny muted" aria-live="polite"></div>
+        </header>
+        <div class="workspace">
+          <section class="page" data-page="chat">
+            <div class="chat-layout">
+              <div id="chat_log" class="chat-log"></div>
+              <form id="chat_form" class="composer">
+                <label class="label" for="chat_query">消息</label>
+                <textarea id="chat_query" placeholder="发送消息给 MiniMem（Ctrl+Enter 发送）"></textarea>
+                <div class="composer-actions">
+                  <div class="composer-left">
+                    <label class="label" for="chat_provider" style="margin:0">Provider</label>
+                    <select id="chat_provider"></select>
+                    <label class="label" for="chat_top_k" style="margin:0">TopK</label>
+                    <input id="chat_top_k" type="number" min="1" max="30" value="6" />
+                    <span id="chat_policy" class="tiny">policy: -</span>
+                  </div>
+                  <div class="composer-right">
+                    <span id="chat_runtime_meta" class="tiny">provider: -</span>
+                    <span class="tiny">Ctrl+Enter</span>
+                    <button id="btn_chat_send" class="primary" type="submit">发送</button>
+                  </div>
+                </div>
+              </form>
+            </div>
+          </section>
+
+          <section class="page hidden" data-page="ingest">
+            <div class="page-body">
+              <h3 style="margin:0">Mem Ingest</h3>
+              <div class="ingest-panel">
+                <label class="label" for="ingest_content">markdown content</label>
+                <textarea id="ingest_content" class="input-xl" placeholder="支持 Markdown 输入，例如：&#10;# 今日对话&#10;- 我叫李明&#10;- 我喜欢咖啡"></textarea>
+                <div class="tiny">message-id 与 sender 自动生成，写入成功后显示结构化结果。</div>
+              </div>
+              <div class="manage-actions">
+                <button id="btn_ingest" class="primary" type="button">提交写入</button>
+                <button id="btn_ingest_clear" type="button">清空输入</button>
+              </div>
+              <div id="ingest_status" class="tiny muted" aria-live="polite"></div>
+              <section id="ingest_result_card" class="form-sheet hidden">
+                <h4>本次写入结果</h4>
+                <dl id="ingest_result_grid" class="kv-list"></dl>
+                <div>
+                  <div class="label">content slices</div>
+                  <div id="ingest_slice_list" class="slice-list"></div>
+                </div>
+              </section>
+              <section id="ingest_error" class="form-sheet hidden" aria-live="polite">
+                <h4 class="err">写入失败</h4>
+                <div id="ingest_error_text" class="tiny err"></div>
+              </section>
+            </div>
+          </section>
+
+          <section class="page hidden" data-page="manage">
+            <div class="page-body">
+              <h3 style="margin:0">Mem Manage</h3>
+              <section class="manage-toolbar">
+                <div>
+                  <label class="label" for="manage_query">query</label>
+                  <textarea id="manage_query" class="input-lg" placeholder="输入检索问题，支持多行"></textarea>
+                </div>
+                <div class="manage-controls">
+                  <div><label class="label" for="manage_method">retrieve_method</label><select id="manage_method"><option value="keyword">keyword</option><option value="vector">vector</option><option value="hybrid">hybrid</option><option value="rrf">rrf</option><option value="agentic">agentic</option></select></div>
+                  <div><label class="label" for="manage_decision">decision_mode</label><select id="manage_decision"><option value="static">static</option><option value="rule">rule</option><option value="agent">agent</option></select></div>
+                </div>
+                <div class="manage-actions">
+                  <button id="btn_manage_search" class="primary" type="button">搜索</button>
+                </div>
+              </section>
+              <div class="manage-fetch-wrap">
+                <button id="btn_manage_fetch" type="button">拉取最新</button>
+              </div>
+              <div id="manage_status" class="tiny muted" aria-live="polite"></div>
+              <div class="label">memories</div>
+              <div id="manage_list" class="memory-list"></div>
+              <div class="label">conflicts</div>
+              <div id="manage_conflicts" class="memory-list"></div>
+            </div>
+          </section>
+
+          <section class="page hidden" data-page="graph">
+            <div class="page-body">
+              <h3 id="graph_heading" style="margin:0">Graph Explorer</h3>
+              <div class="graph-explorer">
+                <section class="graph-query-panel">
+                  <div>
+                    <label class="label" for="graph_mode">Query Mode</label>
+                    <select id="graph_mode">
+                      <option id="graph_mode_search_label" value="search">Search Triples</option>
+                      <option id="graph_mode_neighbors_label" value="neighbors">Neighbors</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="label" for="graph_limit">limit</label>
+                    <input id="graph_limit" type="number" min="1" max="100" value="20" />
+                  </div>
+                  <div>
+                    <label class="label" for="graph_editor">Query</label>
+                    <textarea id="graph_editor" placeholder="Enter query text…&#10;Shift+Enter to run"></textarea>
+                    <div class="tiny">Query Panel style: execute with button or Shift+Enter.</div>
+                  </div>
+                  <div class="manage-actions">
+                    <button id="btn_graph_run" class="primary" type="button">Run Query</button>
+                    <button id="btn_graph_clear" type="button">Clear</button>
+                  </div>
+                  <div id="graph_examples_label" class="label">Examples</div>
+                  <div class="examples">
+                    <button id="graph_example_1" class="example-btn" type="button" data-mode="search" data-query="喜欢 咖啡">Search: 喜欢 咖啡</button>
+                    <button id="graph_example_2" class="example-btn" type="button" data-mode="search" data-query="项目 截止 时间">Search: 项目 截止 时间</button>
+                    <button id="graph_example_3" class="example-btn" type="button" data-mode="neighbors" data-query="李明">Neighbors: 李明</button>
+                  </div>
+                  <div id="graph_status" class="tiny muted" aria-live="polite"></div>
+                </section>
+
+                <section class="graph-viewer">
+                  <div class="graph-head">
+                    <strong id="graph_result_title">Results</strong>
+                    <span id="graph_result_meta" class="tiny muted">0 rows</span>
+                  </div>
+                  <div class="graph-tabs">
+                    <button id="graph_tab_graph" class="graph-tab active" data-view="graph" type="button">Graph</button>
+                    <button id="graph_tab_table" class="graph-tab" data-view="table" type="button">Table</button>
+                    <button id="graph_tab_json" class="graph-tab" data-view="json" type="button">JSON</button>
+                  </div>
+                  <div class="graph-view">
+                    <div id="graph_view_graph" class="graph-canvas">
+                      <section id="graph_stage" class="graph-stage">
+                        <div class="graph-stage-top">
+                          <div class="graph-legend tiny">
+                            <span><i class="legend-dot subject"></i>Entity</span>
+                            <span><i class="legend-dot edge"></i>Relation</span>
+                          </div>
+                          <div class="row" style="gap:8px">
+                            <span id="graph_stage_meta" class="graph-stage-meta">0 nodes · 0 edges · 100%</span>
+                            <div class="graph-stage-actions" aria-label="graph tools">
+                              <button id="btn_graph_zoom_out" class="graph-tool-btn" type="button" title="Zoom out">-</button>
+                              <button id="btn_graph_zoom_reset" class="graph-tool-btn" type="button" title="Reset view">100%</button>
+                              <button id="btn_graph_zoom_in" class="graph-tool-btn" type="button" title="Zoom in">+</button>
+                            </div>
+                          </div>
+                        </div>
+                        <svg id="graph_svg" viewBox="0 0 1000 620" preserveAspectRatio="xMidYMid meet" aria-label="graph visualization"></svg>
+                        <div id="graph_empty" class="graph-empty">No graph result</div>
+                      </section>
+                      <section class="graph-side">
+                        <h4 id="graph_inspector_title">Inspector</h4>
+                        <div id="graph_inspector" class="graph-kv">
+                          <div class="tiny muted">Select node or relationship to inspect.</div>
+                        </div>
+                        <h4 id="graph_nodes_title">Nodes</h4>
+                        <div id="graph_nodes" class="graph-list"></div>
+                        <h4 id="graph_edges_title">Relationships</h4>
+                        <div id="graph_edges" class="graph-list"></div>
+                      </section>
+                    </div>
+                    <div id="graph_view_table" class="hidden">
+                      <table class="graph-table">
+                        <thead>
+                          <tr>
+                            <th>subject</th>
+                            <th>relation</th>
+                            <th>object</th>
+                            <th>confidence</th>
+                            <th>timestamp</th>
+                            <th>event_id</th>
+                          </tr>
+                        </thead>
+                        <tbody id="graph_table_body"></tbody>
+                      </table>
+                    </div>
+                    <pre id="graph_view_json" class="out hidden"></pre>
+                  </div>
+                </section>
+              </div>
+            </div>
+          </section>
+          <section class="page hidden" data-page="config">
+            <div class="page-body">
+              <h3 style="margin:0">Settings</h3>
+              <div class="config-layout">
+                <div>
+                  <label id="label_ui_language" class="label" for="ui_language">ui language</label>
+                  <select id="ui_language">
+                    <option value="en">English</option>
+                    <option value="zh-CN">中文</option>
+                  </select>
+                </div>
+                <section class="config-panel">
+                  <h4>Chat Provider</h4>
+                  <div class="config-grid">
+                    <div><label class="label" for="cfg_chat_provider">provider</label><select id="cfg_chat_provider"></select></div>
+                    <div><label class="label" for="cfg_chat_base_url">base_url</label><input id="cfg_chat_base_url" placeholder="https://api.example.com/v1" /></div>
+                    <div><label class="label" for="cfg_chat_api_key">api_key</label><input id="cfg_chat_api_key" type="password" autocomplete="off" /></div>
+                    <div><label class="label" for="cfg_chat_model">model</label><input id="cfg_chat_model" placeholder="Qwen/Qwen3-8B" /></div>
+                  </div>
+                </section>
+                <section class="config-panel">
+                  <h4>Embedding Provider</h4>
+                  <div class="config-grid">
+                    <div>
+                      <label class="label" for="cfg_embedding_provider">provider</label>
+                      <select id="cfg_embedding_provider">
+                        <option value="openai">openai</option>
+                        <option value="custom">custom</option>
+                      </select>
+                    </div>
+                    <div><label class="label" for="cfg_embed_base_url">base_url</label><input id="cfg_embed_base_url" placeholder="https://api.example.com/v1" /></div>
+                    <div><label class="label" for="cfg_embed_api_key">api_key</label><input id="cfg_embed_api_key" type="password" autocomplete="off" /></div>
+                    <div><label class="label" for="cfg_embed_model">model</label><input id="cfg_embed_model" placeholder="text-embedding-3-small" /></div>
+                  </div>
+                </section>
+                <section class="config-panel">
+                  <h4>Extractor Provider</h4>
+                  <div class="config-grid">
+                    <div>
+                      <label class="label" for="cfg_extractor_provider">provider</label>
+                      <select id="cfg_extractor_provider">
+                        <option value="chat_model">chat_model</option>
+                        <option value="openai">openai</option>
+                        <option value="custom">custom</option>
+                        <option value="rule">rule</option>
+                      </select>
+                    </div>
+                    <div><label class="label" for="cfg_extractor_base_url">base_url</label><input id="cfg_extractor_base_url" placeholder="https://api.example.com/v1" /></div>
+                    <div><label class="label" for="cfg_extractor_api_key">api_key</label><input id="cfg_extractor_api_key" type="password" autocomplete="off" /></div>
+                    <div><label class="label" for="cfg_extractor_model">model</label><input id="cfg_extractor_model" placeholder="Qwen/Qwen3-8B" /></div>
+                  </div>
+                </section>
+                <div class="row">
+                  <button id="btn_cfg_load" type="button">读取配置</button>
+                  <button id="btn_cfg_save" class="primary" type="button">保存配置</button>
+                  <button id="btn_cfg_test" type="button">测试连通</button>
+                </div>
+                <div id="config_status" class="tiny muted config-status" aria-live="polite"></div>
+              </div>
+            </div>
+          </section>
+
+        </div>
+      </main>
+    </div>
+  </section>
+
+  <script>
+    const AUTH_KEY="minimem.auth";
+    const LANG_KEY="minimem.lang";
+    const USERS_KEY="minimem.users";
+    const SESSIONS_KEY="minimem.sessions.v4";
+    const DEFAULT_GROUP_ID="default";
+    const DEFAULT_CHAT_PROVIDER="siliconflow";
+    const DEFAULT_PROVIDER_OPTIONS={
+      siliconflow:{base_url:"https://api.siliconflow.cn/v1",api_key:"",model:"Qwen/Qwen3-8B"},
+      openai:{base_url:"",api_key:"",model:"Qwen/Qwen3-8B"},
+      custom:{base_url:"",api_key:"",model:"Qwen/Qwen3-8B"}
+    };
+    const auth={username:"",groupId:DEFAULT_GROUP_ID};
+    const I18N_TEXT={
+      en:{
+        "sidebar.user":"user",
+        "sidebar.group":"group",
+        "sidebar.logout":"Sign out",
+        "sidebar.new_session":"New Chat",
+        "sidebar.conversations":"Conversations",
+        "nav.chat":"Chat",
+        "nav.ingest":"Mem Ingest",
+        "nav.manage":"Mem Manage",
+        "nav.graph":"Graph",
+        "nav.config":"Settings",
+        "session.new":"New Chat",
+        "session.messages":"messages",
+        "settings.ui_language":"ui language",
+        "graph.heading":"Graph Explorer",
+        "graph.results":"Results",
+        "graph.status.ready":"ready",
+        "graph.status.running":"running…",
+        "graph.status.loaded":"loaded",
+        "graph.status.empty":"No graph result",
+        "graph.query.placeholder":"Enter query text…\nShift+Enter to run",
+        "graph.query.placeholder_neighbors":"Enter entity name…\nShift+Enter to run",
+        "graph.run":"Run Query",
+        "graph.clear":"Clear",
+        "graph.examples":"Examples",
+        "graph.example1":"Search: 喜欢 咖啡",
+        "graph.example2":"Search: 项目 截止 时间",
+        "graph.example3":"Neighbors: 李明",
+        "graph.tab.graph":"Graph",
+        "graph.tab.table":"Table",
+        "graph.tab.json":"JSON",
+        "graph.nodes":"Nodes",
+        "graph.relationships":"Relationships",
+        "graph.inspector":"Inspector",
+        "graph.inspector.empty":"Select node or relationship to inspect.",
+        "graph.mode.search":"Search Triples",
+        "graph.mode.neighbors":"Neighbors",
+      },
+      "zh-CN":{
+        "sidebar.user":"用户",
+        "sidebar.group":"分组",
+        "sidebar.logout":"退出",
+        "sidebar.new_session":"新会话",
+        "sidebar.conversations":"会话历史",
+        "nav.chat":"会话",
+        "nav.ingest":"记忆写入",
+        "nav.manage":"记忆管理",
+        "nav.graph":"图谱",
+        "nav.config":"设置",
+        "session.new":"新会话",
+        "session.messages":"条消息",
+        "settings.ui_language":"界面语言",
+        "graph.heading":"图谱工作台",
+        "graph.results":"结果",
+        "graph.status.ready":"就绪",
+        "graph.status.running":"执行中…",
+        "graph.status.loaded":"已加载",
+        "graph.status.empty":"暂无图谱结果",
+        "graph.query.placeholder":"输入检索文本…\nShift+Enter 执行",
+        "graph.query.placeholder_neighbors":"输入实体名称…\nShift+Enter 执行",
+        "graph.run":"执行查询",
+        "graph.clear":"清空",
+        "graph.examples":"示例",
+        "graph.example1":"检索：喜欢 咖啡",
+        "graph.example2":"检索：项目 截止 时间",
+        "graph.example3":"邻居：李明",
+        "graph.tab.graph":"图视图",
+        "graph.tab.table":"表格",
+        "graph.tab.json":"JSON",
+        "graph.nodes":"节点",
+        "graph.relationships":"关系",
+        "graph.inspector":"检查器",
+        "graph.inspector.empty":"选择节点或关系后查看属性。",
+        "graph.mode.search":"三元组检索",
+        "graph.mode.neighbors":"邻居查询",
+      },
+    };
+    const PAGE_META_BY_LANG={
+      en:{
+        chat:["Chat","Conversation & memory retrieval"],
+        ingest:["Mem Ingest","Write Markdown memory items"],
+        manage:["Mem Manage","Search, conflicts, and deletion"],
+        graph:["Graph","Query panel, graph, table, and JSON views"],
+        config:["Settings","Model providers & runtime policy"],
+      },
+      "zh-CN":{
+        chat:["会话","对话与记忆检索"],
+        ingest:["记忆写入","写入 Markdown 记忆"],
+        manage:["记忆管理","检索、冲突跟踪与逐条删除"],
+        graph:["图谱","查询面板、图视图、表格与 JSON"],
+        config:["设置","模型 provider 与运行策略"],
+      },
+    };
+    const state={
+      sessions:[],
+      activeId:null,
+      lang:"en",
+      page:"chat",
+      sending:false,
+      modelConfig:{
+        chat_provider:DEFAULT_CHAT_PROVIDER,
+        chat_model:"",
+        chat_base_url:"",
+        chat_api_key:"",
+        embedding_provider:"openai",
+        embedding_base_url:"",
+        embedding_api_key:"",
+        embedding_model:"",
+        extractor_provider:"chat_model",
+        extractor_base_url:"",
+        extractor_api_key:"",
+        extractor_model:"",
+        chat_provider_options:{...DEFAULT_PROVIDER_OPTIONS}
+      }
+    };
+    const graphState={
+      rows:[],
+      nodes:[],
+      view:"graph",
+      selectedNode:"",
+      selectedEdgeIndex:-1,
+      mode:"search",
+      graphNodeMap:{},
+      transform:{scale:1,tx:0,ty:0},
+      drag:{active:false,lastX:0,lastY:0,moved:false},
+    };
+
+    const qs=(id)=>document.getElementById(id);
+    const qsa=(sel)=>Array.from(document.querySelectorAll(sel));
+    const safe=(v)=>String(v??"").replace(/[&<>"']/g,(s)=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[s]));
+    const nowSec=()=>Math.floor(Date.now()/1000);
+    const randId=(p="id")=>p+"-"+Math.random().toString(36).slice(2,10);
+    const renderJson=(id,data)=>{qs(id).textContent=JSON.stringify(data,null,2)};
+    const parseBool=(v)=>v==="true"?true:(v==="false"?false:null);
+    const normalizeLang=(v)=>String(v)==="zh-CN"?"zh-CN":"en";
+    const t=(key)=>I18N_TEXT[state.lang]?.[key]??I18N_TEXT.en[key]??key;
+    const activeLocale=()=>state.lang==="zh-CN"?"zh-CN":"en-US";
+    const pageMeta=(page)=>PAGE_META_BY_LANG[state.lang]?.[page]??PAGE_META_BY_LANG.en[page]??["Console",""];
+    const formatDateTime=(valueSec)=>{
+      const ts=Number(valueSec||0);
+      if(!ts)return "-";
+      return new Intl.DateTimeFormat(activeLocale(),{
+        year:"numeric",
+        month:"2-digit",
+        day:"2-digit",
+        hour:"2-digit",
+        minute:"2-digit",
+        second:"2-digit",
+      }).format(new Date(ts*1000));
+    };
+    const formatShortDateTime=(valueSec)=>{
+      const ts=Number(valueSec||0);
+      if(!ts)return "--";
+      return new Intl.DateTimeFormat(activeLocale(),{
+        month:"2-digit",
+        day:"2-digit",
+        hour:"2-digit",
+        minute:"2-digit",
+      }).format(new Date(ts*1000));
+    };
+    function splitContentSlices(content){
+      const lines=String(content||"").split(/\n{2,}/g).map((x)=>x.trim()).filter(Boolean);
+      const base=lines.length?lines:[String(content||"").trim()];
+      const out=[];
+      for(const part of base){
+        if(part.length<=240){
+          out.push(part);
+          continue;
+        }
+        for(let i=0;i<part.length;i+=240){
+          out.push(part.slice(i,i+240));
+        }
+      }
+      return out.filter(Boolean).slice(0,12);
+    }
+    const shortText=(value,max=220)=>{
+      const raw=String(value??"").trim().replace(/\s+/g," ");
+      if(!raw)return "";
+      return raw.length>max?`${raw.slice(0,max)}...`:raw;
+    };
+    function renderCitationPanelHtml(citations){
+      const rows=Array.isArray(citations)?citations:[];
+      if(!rows.length){
+        return "<div class='tiny muted'>No citations</div>";
+      }
+      const maxItems=8;
+      const items=rows.slice(0,maxItems).map((c,idx)=>{
+        const summary=shortText(c?.summary||c?.episode||"-",220);
+        const source=String(c?.source||"-");
+        const tier=String(c?.storage_tier||"-");
+        const score=Number(c?.score);
+        const imp=Number(c?.importance_score);
+        const scoreText=Number.isFinite(score)?`score ${score.toFixed(3)}`:"";
+        const impText=Number.isFinite(imp)?`imp ${imp.toFixed(3)}`:"";
+        const timeText=formatDateTime(Number(c?.timestamp||0));
+        return (
+          "<article class='citation-item'>"+
+          `<div class='citation-item-main'>${idx+1}. ${safe(summary)}</div>`+
+          "<div class='citation-item-meta'>"+
+          `<span>${safe(source)}</span>`+
+          `<span>${safe(tier)}</span>`+
+          `${scoreText?`<span>${safe(scoreText)}</span>`:""}`+
+          `${impText?`<span>${safe(impText)}</span>`:""}`+
+          `<span>${safe(timeText)}</span>`+
+          "</div>"+
+          "</article>"
+        );
+      });
+      if(rows.length>maxItems){
+        items.push(`<div class='tiny muted'>+${rows.length-maxItems} more citations</div>`);
+      }
+      return items.join("");
+    }
+
+    function setGlobalStatus(text,ok=true){
+      const el=qs("global_status");
+      el.textContent=text||"";
+      el.className=ok?"tiny ok":"tiny err";
+    }
+    function setIngestStatus(text,ok=true){
+      const el=qs("ingest_status");
+      if(!el)return;
+      el.textContent=text||"";
+      el.className=ok?"tiny ok":"tiny err";
+    }
+    function setManageStatus(text,ok=true){
+      const el=qs("manage_status");
+      if(!el)return;
+      el.textContent=text||"";
+      el.className=ok?"tiny ok":"tiny err";
+    }
+    function setGraphStatus(text,ok=true){
+      const el=qs("graph_status");
+      if(!el)return;
+      el.textContent=text||"";
+      el.className=ok?"tiny ok":"tiny err";
+    }
+    function setConfigStatus(text,ok=true){
+      const el=qs("config_status");
+      if(!el)return;
+      el.textContent=text||"";
+      el.className=ok?"tiny ok config-status":"tiny err config-status";
+    }
+    function loadLang(){
+      const saved=localStorage.getItem(LANG_KEY);
+      state.lang=normalizeLang(saved||"en");
+    }
+    function saveLang(){
+      localStorage.setItem(LANG_KEY,state.lang);
+    }
+    function applyLanguage(){
+      qs("btn_logout").textContent=t("sidebar.logout");
+      qs("btn_new_session").textContent=t("sidebar.new_session");
+      qs("sessions_title").textContent=t("sidebar.conversations");
+      qsa(".nav-btn").forEach((btn)=>{
+        if(btn.dataset.i18nKey)btn.textContent=t(btn.dataset.i18nKey);
+      });
+      qs("label_ui_language").textContent=t("settings.ui_language");
+      qs("graph_heading").textContent=t("graph.heading");
+      qs("graph_result_title").textContent=t("graph.results");
+      qs("btn_graph_run").textContent=t("graph.run");
+      qs("btn_graph_clear").textContent=t("graph.clear");
+      qs("graph_examples_label").textContent=t("graph.examples");
+      qs("graph_example_1").textContent=t("graph.example1");
+      qs("graph_example_2").textContent=t("graph.example2");
+      qs("graph_example_3").textContent=t("graph.example3");
+      qs("graph_tab_graph").textContent=t("graph.tab.graph");
+      qs("graph_tab_table").textContent=t("graph.tab.table");
+      qs("graph_tab_json").textContent=t("graph.tab.json");
+      qs("graph_nodes_title").textContent=t("graph.nodes");
+      qs("graph_edges_title").textContent=t("graph.relationships");
+      qs("graph_inspector_title").textContent=t("graph.inspector");
+      qs("graph_mode_search_label").textContent=t("graph.mode.search");
+      qs("graph_mode_neighbors_label").textContent=t("graph.mode.neighbors");
+      qs("ui_language").value=state.lang;
+      syncGraphEditorPlaceholder();
+      updatePageHeader();
+      renderAuth();
+      renderSessions();
+      renderGraphResults(graphState.rows);
+    }
+    function setLanguage(next){
+      state.lang=normalizeLang(next);
+      saveLang();
+      applyLanguage();
+      setGlobalStatus(`language: ${state.lang}`);
+    }
+    function updatePageHeader(){
+      const m=pageMeta(state.page);
+      qs("page_title").textContent=m[0];
+      qs("page_hint").textContent=m[1];
+    }
+    function syncGraphEditorPlaceholder(){
+      const mode=qs("graph_mode").value||"search";
+      qs("graph_editor").placeholder=mode==="neighbors"
+        ? t("graph.query.placeholder_neighbors")
+        : t("graph.query.placeholder");
+    }
+    function buttonBusy(btn,busy,text="处理中..."){
+      if(!btn)return;
+      if(busy){
+        btn.dataset.oldText=btn.textContent;
+        btn.textContent=text;
+        btn.disabled=true;
+      }else{
+        btn.textContent=btn.dataset.oldText||btn.textContent;
+        btn.disabled=false;
+      }
+    }
+    async function api(path,options={}){
+      const opts={...options};
+      opts.headers={"content-type":"application/json",...(opts.headers||{})};
+      if(opts.body&&typeof opts.body!=="string")opts.body=JSON.stringify(opts.body);
+      const res=await fetch(path,opts);
+      const text=await res.text();
+      let data={};
+      try{data=text?JSON.parse(text):{}}catch{data={raw:text}}
+      if(!res.ok)throw new Error(`${res.status} ${JSON.stringify(data)}`);
+      return data;
+    }
+
+    function normalizeProviderOptions(raw){
+      const merged={...DEFAULT_PROVIDER_OPTIONS};
+      if(raw&&typeof raw==="object"){
+        for(const [name,cfg] of Object.entries(raw)){
+          if(!name||!cfg||typeof cfg!=="object")continue;
+          merged[String(name)]={
+            base_url:String(cfg.base_url||""),
+            api_key:String(cfg.api_key||""),
+            model:String(cfg.model||"")
+          };
+        }
+      }
+      return merged;
+    }
+    function normalizeModelConfig(cfg){
+      const options=normalizeProviderOptions(cfg.chat_provider_options||{});
+      let provider=String(cfg.chat_provider||DEFAULT_CHAT_PROVIDER).trim()||DEFAULT_CHAT_PROVIDER;
+      if(!options[provider])provider=DEFAULT_CHAT_PROVIDER;
+      const selected=options[provider]||{base_url:"",api_key:"",model:""};
+      const extractorProviderRaw=String(cfg.extractor_provider||"chat_model").trim()||"chat_model";
+      const extractorProvider=["chat_model","openai","custom","rule"].includes(extractorProviderRaw)
+        ? extractorProviderRaw
+        : "custom";
+      return {
+        chat_provider:provider,
+        chat_model:String(selected.model||cfg.chat_model||""),
+        chat_base_url:String(selected.base_url||cfg.chat_base_url||""),
+        chat_api_key:String(selected.api_key||cfg.chat_api_key||""),
+        embedding_provider:String(cfg.embedding_provider||"openai"),
+        embedding_base_url:String(cfg.embedding_base_url||""),
+        embedding_api_key:String(cfg.embedding_api_key||""),
+        embedding_model:String(cfg.embedding_model||""),
+        extractor_provider:extractorProvider,
+        extractor_base_url:String(cfg.extractor_base_url||cfg.chat_base_url||selected.base_url||""),
+        extractor_api_key:String(cfg.extractor_api_key||cfg.chat_api_key||selected.api_key||""),
+        extractor_model:String(cfg.extractor_model||cfg.chat_model||selected.model||""),
+        chat_provider_options:options
+      };
+    }
+    function providerNames(){
+      return Object.keys(state.modelConfig.chat_provider_options||{}).sort((a,b)=>a.localeCompare(b));
+    }
+    function ensureProviderOption(name){
+      const key=String(name||"").trim();
+      if(!key)return DEFAULT_CHAT_PROVIDER;
+      if(!state.modelConfig.chat_provider_options[key]){
+        state.modelConfig.chat_provider_options[key]={base_url:"",api_key:"",model:""};
+      }
+      return key;
+    }
+
+    function seedDefaultUsers(){
+      if(localStorage.getItem(USERS_KEY))return;
+      localStorage.setItem(USERS_KEY,JSON.stringify([{username:"admin",password:"admin123"},{username:"demo",password:"demo123"}]));
+    }
+    function verifyUser(u,p){
+      const users=JSON.parse(localStorage.getItem(USERS_KEY)||"[]");
+      return users.some(x=>x.username===u&&x.password===p);
+    }
+    const saveAuth=()=>localStorage.setItem(AUTH_KEY,JSON.stringify(auth));
+    function loadAuth(){
+      const raw=localStorage.getItem(AUTH_KEY);
+      if(!raw)return false;
+      try{
+        const v=JSON.parse(raw);
+        auth.username=v.username||"";
+        auth.groupId=v.groupId||DEFAULT_GROUP_ID;
+        return !!auth.username;
+      }catch{
+        return false;
+      }
+    }
+    function clearAuth(){
+      auth.username="";
+      auth.groupId=DEFAULT_GROUP_ID;
+      localStorage.removeItem(AUTH_KEY);
+    }
+    const isDefaultSessionTitle=(title)=>{
+      const val=String(title||"").trim();
+      return !val || val==="New Chat" || val==="新会话";
+    };
+
+    function makeNewSession(){
+      return {
+        id:randId("sess"),
+        title:t("session.new"),
+        provider:state.modelConfig.chat_provider||DEFAULT_CHAT_PROVIDER,
+        messages:[],
+        createdAt:Date.now()
+      };
+    }
+    function normalizeSession(s){
+      const provider=String(s?.provider||state.modelConfig.chat_provider||DEFAULT_CHAT_PROVIDER);
+      const validProvider=state.modelConfig.chat_provider_options[provider]?provider:(state.modelConfig.chat_provider||DEFAULT_CHAT_PROVIDER);
+      return {
+        id:String(s?.id||randId("sess")),
+        title:String(s?.title||t("session.new")),
+        provider:validProvider,
+        messages:Array.isArray(s?.messages)?s.messages.map((m)=>({
+          role:m?.role==="user"?"user":"assistant",
+          content:String(m?.content||""),
+          citations:Array.isArray(m?.citations)?m.citations:[],
+          provider:m?.provider?String(m.provider):"",
+          model:m?.model?String(m.model):"",
+          ts:Number(m?.ts||Date.now())
+        })):[],
+        createdAt:Number(s?.createdAt||Date.now())
+      };
+    }
+    const saveSessions=()=>localStorage.setItem(SESSIONS_KEY,JSON.stringify(state.sessions));
+    function loadSessions(){
+      const raw=localStorage.getItem(SESSIONS_KEY);
+      if(!raw){state.sessions=[];return;}
+      try{
+        const arr=JSON.parse(raw);
+        state.sessions=Array.isArray(arr)?arr.map(normalizeSession):[];
+      }catch{
+        state.sessions=[];
+      }
+    }
+    function ensureSession(){
+      if(!state.sessions.length)state.sessions.unshift(makeNewSession());
+      if(!state.activeId||!state.sessions.some(x=>x.id===state.activeId))state.activeId=state.sessions[0].id;
+      saveSessions();
+    }
+    function alignSessionsWithProviderConfig(){
+      const fallback=state.modelConfig.chat_provider||DEFAULT_CHAT_PROVIDER;
+      for(const s of state.sessions){
+        if(!s.provider||!state.modelConfig.chat_provider_options[s.provider])s.provider=fallback;
+        if(isDefaultSessionTitle(s.title)&&(!Array.isArray(s.messages)||s.messages.length===0))s.provider=fallback;
+      }
+      if(!state.sessions.some((x)=>x.id===state.activeId)&&state.sessions.length)state.activeId=state.sessions[0].id;
+      saveSessions();
+    }
+    const activeSession=()=>state.sessions.find(x=>x.id===state.activeId)||null;
+    function activateSession(sessionId,{switchToChat=true}={}){
+      const id=String(sessionId||"").trim();
+      if(!id||!state.sessions.some((s)=>s.id===id))return;
+      state.activeId=id;
+      saveSessions();
+      renderSessions();
+      renderChat();
+      if(switchToChat&&state.page!=="chat"){
+        switchPage("chat");
+      }
+    }
+
+    function renderAuth(){
+      qs("chip_user").textContent=`${t("sidebar.user")}: ${auth.username||"-"}`;
+      qs("chip_group").textContent=`${t("sidebar.group")}: ${auth.groupId||"-"}`;
+    }
+    function showLogin(){
+      qs("login_view").classList.remove("hidden");
+      qs("app_view").classList.add("hidden");
+    }
+    function showApp(){
+      qs("login_view").classList.add("hidden");
+      qs("app_view").classList.remove("hidden");
+    }
+
+    function switchPage(page){
+      const prev=state.page;
+      state.page=page;
+      qsa(".nav-btn").forEach((el)=>el.classList.toggle("active",el.dataset.page===page));
+      qsa(".page").forEach((el)=>el.classList.toggle("hidden",el.dataset.page!==page));
+      updatePageHeader();
+      if(
+        page==="manage" &&
+        prev!=="manage" &&
+        !qs("app_view").classList.contains("hidden")
+      ){
+        manageFetch();
+      }
+    }
+
+    function updateSessionTitle(sess){
+      if(!sess||!Array.isArray(sess.messages)||!sess.messages.length)return;
+      if(sess.title&&!isDefaultSessionTitle(sess.title))return;
+      const first=(sess.messages.find((x)=>x.role==="user")||sess.messages[0]).content||"";
+      sess.title=first.trim().slice(0,42)||t("session.new");
+    }
+    function extractMemoriesFromPayload(data){
+      const rows=data?.result?.memories;
+      if(Array.isArray(rows))return rows;
+      return [];
+    }
+    function extractConflictsFromPayload(data){
+      const rows=data?.result?.conflicts;
+      if(Array.isArray(rows))return rows;
+      return [];
+    }
+    function renderManageList(rows){
+      const list=qs("manage_list");
+      if(!list)return;
+      if(!Array.isArray(rows)||!rows.length){
+        list.innerHTML="<div class='tiny muted'>暂无记忆结果</div>";
+        return;
+      }
+      const body = rows.map((m)=>{
+        const score=Number(m?.importance_score||0);
+        const summary=String(m?.summary||m?.episode||"").trim();
+        const subject=String(m?.subject||"-");
+        const source=String(m?.source||"memory");
+        const tier=String(m?.storage_tier||"text_only");
+        const sceneId=String(m?.scene_id||"-");
+        const eventId=String(m?.event_id||"").trim();
+        const memoryId=String(m?.id||m?.memory_id||"-");
+        const ts=Number(m?.timestamp||0);
+        const timeText=formatDateTime(ts);
+        return (
+          "<tr>"+
+          `<td>${safe(timeText)}</td>`+
+          `<td>${Number.isFinite(score)?score.toFixed(3):"0.000"}</td>`+
+          `<td>${safe(tier)}</td>`+
+          `<td>${safe(sceneId)}</td>`+
+          `<td>${safe(source)}</td>`+
+          `<td>${safe(subject)}</td>`+
+          `<td class='summary'>${safe(summary||"-")}</td>`+
+          `<td class='mono'>${safe(memoryId)}</td>`+
+          `<td class='mono'>${safe(eventId||"-")}</td>`+
+          `<td>${
+            eventId
+              ? `<button class='danger dense-action btn-delete-memory' type='button' data-event-id='${safe(eventId)}' aria-label='删除该条记忆'>删除</button>`
+              : "-"
+          }</td>`+
+          "</tr>"
+        );
+      }).join("");
+      list.innerHTML=
+        "<div class='dense-table-wrap'>"+
+        "<table class='dense-table'>"+
+        "<thead><tr>"+
+        "<th>time</th><th>imp</th><th>tier</th><th>scene</th><th>source</th>"+
+        "<th>subject</th><th>summary</th><th>memory_id</th><th>event_id</th><th>action</th>"+
+        "</tr></thead>"+
+        `<tbody>${body}</tbody>`+
+        "</table>"+
+        "</div>";
+    }
+    function renderConflictList(rows){
+      const list=qs("manage_conflicts");
+      if(!list)return;
+      if(!Array.isArray(rows)||!rows.length){
+        list.innerHTML="<div class='tiny muted'>未发现画像冲突记录</div>";
+        return;
+      }
+      const body = rows.map((c)=>{
+        const field=String(c?.field_name||c?.field||"-");
+        const oldVal=String(c?.old_value||c?.old||"-");
+        const newVal=String(c?.new_value||c?.new||"-");
+        const ts=Number(c?.happened_at||c?.timestamp||0);
+        const timeText=ts?formatDateTime(ts):"-";
+        return (
+          "<tr>"+
+          `<td>${safe(timeText)}</td>`+
+          `<td>${safe(field)}</td>`+
+          `<td class='summary'>${safe(oldVal)}</td>`+
+          `<td class='summary'>${safe(newVal)}</td>`+
+          "</tr>"
+        );
+      }).join("");
+      list.innerHTML=
+        "<div class='dense-table-wrap'>"+
+        "<table class='dense-table'>"+
+        "<thead><tr><th>time</th><th>field</th><th>old</th><th>new</th></tr></thead>"+
+        `<tbody>${body}</tbody>`+
+        "</table>"+
+        "</div>";
+    }
+    function renderProviderSelect(selectId,currentValue){
+      const el=qs(selectId);
+      if(!el)return;
+      const names=providerNames();
+      const target=currentValue&&names.includes(currentValue)?currentValue:(names.includes(state.modelConfig.chat_provider)?state.modelConfig.chat_provider:(names[0]||DEFAULT_CHAT_PROVIDER));
+      el.innerHTML=names.map((n)=>`<option value="${safe(n)}">${safe(n)}</option>`).join("");
+      if(!names.length){
+        el.innerHTML=`<option value="${DEFAULT_CHAT_PROVIDER}">${DEFAULT_CHAT_PROVIDER}</option>`;
+      }
+      el.value=target;
+    }
+    function renderConfigProviderEditors(preferred){
+      const names=providerNames();
+      const selected=names.includes(preferred)?preferred:(names.includes(state.modelConfig.chat_provider)?state.modelConfig.chat_provider:(names[0]||DEFAULT_CHAT_PROVIDER));
+      renderProviderSelect("cfg_chat_provider",state.modelConfig.chat_provider);
+      loadProviderEditor(selected);
+    }
+    function loadProviderEditor(name){
+      const provider=ensureProviderOption(name||DEFAULT_CHAT_PROVIDER);
+      const cfg=state.modelConfig.chat_provider_options[provider]||{base_url:"",api_key:"",model:""};
+      qs("cfg_chat_provider").value=provider;
+      qs("cfg_chat_base_url").value=cfg.base_url||"";
+      qs("cfg_chat_api_key").value=cfg.api_key||"";
+      qs("cfg_chat_model").value=cfg.model||"";
+    }
+    function applyProviderEditor(){
+      const provider=ensureProviderOption(qs("cfg_chat_provider").value||DEFAULT_CHAT_PROVIDER);
+      state.modelConfig.chat_provider_options[provider]={
+        base_url:qs("cfg_chat_base_url").value.trim(),
+        api_key:qs("cfg_chat_api_key").value.trim(),
+        model:qs("cfg_chat_model").value.trim()
+      };
+      state.modelConfig.chat_provider=provider;
+      state.modelConfig.chat_base_url=state.modelConfig.chat_provider_options[provider].base_url;
+      state.modelConfig.chat_api_key=state.modelConfig.chat_provider_options[provider].api_key;
+      state.modelConfig.chat_model=state.modelConfig.chat_provider_options[provider].model;
+      renderConfigProviderEditors(provider);
+      renderProviderSelect("chat_provider",(activeSession()?.provider)||provider);
+      setConfigStatus(`chat provider: ${provider}`);
+      return provider;
+    }
+    function renderSessions(){
+      const ul=qs("session_list");
+      ul.innerHTML="";
+      for(const s of state.sessions){
+        const lastMsg=(s.messages||[])[(s.messages||[]).length-1];
+        const lastTs=lastMsg?.ts?Math.floor(Number(lastMsg.ts)/1000):0;
+        const timeText=lastTs?formatShortDateTime(lastTs):"--";
+        const li=document.createElement("li");
+        li.className="session-item"+(s.id===state.activeId?" active":"");
+        li.innerHTML=
+          `<p class="session-item-title">${safe(s.title||t("session.new"))}</p>`+
+          `<div class="session-item-meta">`+
+          `<span>${(s.messages||[]).length} ${safe(t("session.messages"))}</span>`+
+          `<span>${safe(timeText)}</span>`+
+          `</div>`+
+          `<div class="session-item-meta">`+
+          `<span class="session-provider">${safe(s.provider||DEFAULT_CHAT_PROVIDER)}</span>`+
+          `</div>`;
+        li.tabIndex=0;
+        li.role="button";
+        li.onclick=()=>{
+          activateSession(s.id,{switchToChat:true});
+        };
+        li.onkeydown=(e)=>{
+          if(e.key==="Enter"||e.key===" "){
+            e.preventDefault();
+            li.click();
+          }
+        };
+        ul.appendChild(li);
+      }
+    }
+    function renderChatRuntimeMeta(){
+      const sess=activeSession();
+      if(!sess){
+        qs("chat_runtime_meta").textContent="provider: -";
+        return;
+      }
+      const lastAssistant=(sess.messages||[]).slice().reverse().find((m)=>m.role==="assistant");
+      const provider=sess.provider||state.modelConfig.chat_provider||DEFAULT_CHAT_PROVIDER;
+      const model=lastAssistant?.model?` · model: ${lastAssistant.model}`:"";
+      qs("chat_runtime_meta").textContent=`provider: ${provider}${model}`;
+      renderProviderSelect("chat_provider",provider);
+    }
+    function renderChat(){
+      const sess=activeSession();
+      const log=qs("chat_log");
+      log.innerHTML="";
+      if(!sess){
+        log.innerHTML="<div class='muted'>无可用会话</div>";
+        renderChatRuntimeMeta();
+        return;
+      }
+      (sess.messages||[]).forEach((m,msgIndex)=>{
+        const wrap=document.createElement("article");
+        wrap.className=`msg ${m.role==="user"?"user":"assistant"}`;
+        const meta=(m.role==="assistant"&&(m.provider||m.model))
+          ?`<div class="msg-meta">${safe((m.provider?`provider: ${m.provider}`:"")+(m.model?` · model: ${m.model}`:""))}</div>`
+          :"";
+        const c=(Array.isArray(m.citations)&&m.citations.length)
+          ?(
+            "<div class='citations'>"+
+            `<button class='citations-toggle' type='button' data-citation-toggle='${msgIndex}' aria-expanded='false'>citations (${m.citations.length})</button>`+
+            `<div class='citations-panel hidden' data-citation-panel='${msgIndex}'></div>`+
+            "</div>"
+          )
+          :"";
+        wrap.innerHTML=
+          `<div class='msg-role'>${safe(m.role||"assistant")}</div>`+
+          `<div class='bubble'>${safe(m.content||"")}</div>`+
+          `${meta}${c}`;
+        log.appendChild(wrap);
+      });
+      log.scrollTop=log.scrollHeight;
+      renderChatRuntimeMeta();
+    }
+
+    function setSessionProvider(provider){
+      const sess=activeSession();
+      if(!sess)return;
+      const next=ensureProviderOption(provider||DEFAULT_CHAT_PROVIDER);
+      sess.provider=next;
+      saveSessions();
+      renderSessions();
+      renderChatRuntimeMeta();
+      setGlobalStatus(`会话 provider: ${next}`);
+    }
+
+    async function sendChat(){
+      if(state.sending)return;
+      const q=qs("chat_query").value.trim();
+      const sess=activeSession();
+      if(!q||!sess)return;
+      const selectedProvider=qs("chat_provider").value||sess.provider||state.modelConfig.chat_provider||DEFAULT_CHAT_PROVIDER;
+      if(selectedProvider!==sess.provider)setSessionProvider(selectedProvider);
+      const topK=Math.max(1,Math.min(30,Number(qs("chat_top_k").value||6)));
+      const btn=qs("btn_chat_send");
+      sess.messages.push({role:"user",content:q,ts:Date.now()});
+      qs("chat_query").value="";
+      updateSessionTitle(sess);
+      saveSessions();
+      renderSessions();
+      renderChat();
+      state.sending=true;
+      buttonBusy(btn,true,"发送中...");
+      try{
+        const data=await api("/api/v1/chat/simple",{
+          method:"POST",
+          body:{
+            query:q,
+            user_id:auth.username,
+            group_id:auth.groupId,
+            top_k:topK,
+            provider:sess.provider||selectedProvider,
+            conversation_id:sess.id
+          }
+        });
+        const r=data.result||{};
+        sess.messages.push({
+          role:"assistant",
+          content:r.answer||"(no answer)",
+          citations:r.citations||[],
+          provider:r.provider||sess.provider||selectedProvider,
+          model:r.model||"",
+          ts:Date.now()
+        });
+        qs("chat_policy").textContent="policy: "+JSON.stringify(r.effective_policy||{});
+        if(r.boundary_detected){
+          qs("chat_policy").textContent+=" | boundary: true";
+        }
+        if(r.memory_saved===false){
+          setGlobalStatus("chat completed (memory not saved)",false);
+        }else{
+          setGlobalStatus("chat completed");
+        }
+      }catch(err){
+        sess.messages.push({role:"assistant",content:"请求失败: "+err.message,ts:Date.now()});
+        setGlobalStatus("chat failed",false);
+      }finally{
+        state.sending=false;
+        buttonBusy(btn,false);
+        saveSessions();
+        renderChat();
+      }
+    }
+    async function ingestMemory(){
+      const btn=qs("btn_ingest");
+      const content=qs("ingest_content").value.trim();
+      if(!content){
+        setIngestStatus("content 不能为空",false);
+        return;
+      }
+      const sender=auth.username||"anonymous";
+      const messageId=`msg-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`;
+      const payload={
+        message_id:messageId,
+        create_time:nowSec(),
+        sender,
+        content,
+        group_id:auth.groupId,
+        sender_name:sender
+      };
+      resetIngestPanels();
+      buttonBusy(btn,true);
+      try{
+        const data=await api("/api/v1/memories",{method:"POST",body:payload});
+        renderIngestSuccess(data,payload);
+        setIngestStatus("写入成功");
+        setGlobalStatus("memory ingested");
+      }catch(err){
+        qs("ingest_error").classList.remove("hidden");
+        qs("ingest_error_text").textContent=String(err.message||"unknown error");
+        setIngestStatus("写入失败",false);
+        setGlobalStatus("ingest failed",false);
+      }finally{
+        buttonBusy(btn,false);
+      }
+    }
+    function resetIngestPanels(){
+      qs("ingest_error").classList.add("hidden");
+      qs("ingest_error_text").textContent="";
+      qs("ingest_result_card").classList.add("hidden");
+      qs("ingest_result_grid").innerHTML="";
+      qs("ingest_slice_list").innerHTML="";
+    }
+    function renderIngestSuccess(data,payload){
+      const result=data?.result||{};
+      const memory=result?.memory||{};
+      const score=Number(memory.importance_score??result.importance_score??0);
+      const scoreText=Number.isFinite(score)?score.toFixed(3):"-";
+      const eventId=String(memory.event_id||result.event_id||data?.request_id||"-");
+      const writeTs=Number(memory.timestamp||payload.create_time||nowSec());
+      const slices=Array.isArray(result.content_slices)&&result.content_slices.length
+        ? result.content_slices
+        : splitContentSlices(payload.content);
+      const rows=[
+        ["message_id",payload.message_id],
+        ["event_id",eventId],
+        ["sender",payload.sender],
+        ["group_id",payload.group_id||"-"],
+        ["importance_score",scoreText],
+        ["storage_tier",String(memory.storage_tier||result.storage_tier||"text_only")],
+        ["scene_id",String(memory.scene_id||result.scene_id||"-")],
+        ["write_time",formatDateTime(writeTs)],
+      ];
+      qs("ingest_result_grid").innerHTML=rows.map(([k,v])=>(
+        "<div class='kv-item'>"+
+        `<dt>${safe(k)}</dt>`+
+        `<dd>${safe(v)}</dd>`+
+        "</div>"
+      )).join("");
+      qs("ingest_slice_list").innerHTML=slices.map((item,idx)=>(
+        `<div class='slice-item'><strong>slice ${idx+1}</strong><br />${safe(item)}</div>`
+      )).join("")||"<div class='tiny muted'>无切片</div>";
+      qs("ingest_result_card").classList.remove("hidden");
+    }
+    async function manageFetch(){
+      const btn=qs("btn_manage_fetch");
+      buttonBusy(btn,true);
+      try{
+        const url=new URL("/api/v1/memories",location.origin);
+        url.searchParams.set("user_id",auth.username);
+        url.searchParams.set("group_id",auth.groupId);
+        url.searchParams.set("limit","60");
+        const data=await api(url.pathname+url.search);
+        renderManageList(extractMemoriesFromPayload(data));
+        renderConflictList(extractConflictsFromPayload(data));
+        setManageStatus("已加载最新记忆");
+        setGlobalStatus("memory list loaded");
+      }catch(err){
+        setManageStatus(String(err.message||"拉取失败"),false);
+        setGlobalStatus("fetch failed",false);
+      }finally{
+        buttonBusy(btn,false);
+      }
+    }
+    async function manageSearch(){
+      const btn=qs("btn_manage_search");
+      const q=qs("manage_query").value.trim();
+      if(!q){
+        setManageStatus("query 不能为空",false);
+        return;
+      }
+      buttonBusy(btn,true);
+      try{
+        const url=new URL("/api/v1/memories/search",location.origin);
+        url.searchParams.set("query",q);
+        url.searchParams.set("user_id",auth.username);
+        url.searchParams.set("group_id",auth.groupId);
+        url.searchParams.set("retrieve_method",qs("manage_method").value);
+        url.searchParams.set("decision_mode",qs("manage_decision").value);
+        url.searchParams.set("top_k","20");
+        const data=await api(url.pathname+url.search);
+        renderManageList(extractMemoriesFromPayload(data));
+        renderConflictList(extractConflictsFromPayload(data));
+        setManageStatus("搜索完成");
+        setGlobalStatus("memory search completed");
+      }catch(err){
+        setManageStatus(String(err.message||"搜索失败"),false);
+        setGlobalStatus("search failed",false);
+      }finally{
+        buttonBusy(btn,false);
+      }
+    }
+    async function deleteByEventId(eventId,btn){
+      const eid=String(eventId||"").trim();
+      if(!eid){
+        setManageStatus("event_id 不能为空",false);
+        return;
+      }
+      if(!confirm("确认删除该条记忆？此操作不可撤销。")){
+        return;
+      }
+      buttonBusy(btn,true,"删除中...");
+      try{
+        const url=new URL("/api/v1/memories",location.origin);
+        url.searchParams.set("event_id",eid);
+        const data=await api(url.pathname+url.search,{method:"DELETE"});
+        const deleted=Number(data?.result?.deleted_count||0);
+        setManageStatus(`删除完成，影响 ${deleted} 条记录`);
+        setGlobalStatus("memory deleted");
+        await manageFetch();
+      }catch(err){
+        setManageStatus(String(err.message||"删除失败"),false);
+        setGlobalStatus("delete failed",false);
+      }finally{
+        buttonBusy(btn,false);
+      }
+    }
+
+    const normalizeGraphRows=(items)=>Array.isArray(items)?items.map((row)=>({
+      subject:String(row?.subject||"-"),
+      relation:String(row?.relation||"-"),
+      obj:String(row?.obj||"-"),
+      event_id:String(row?.event_id||"-"),
+      timestamp:Number(row?.timestamp||0),
+      confidence:Number(row?.confidence||0),
+    })):[];
+    function graphField(key,value){
+      return (
+        "<div class='kv-item'>"+
+        `<dt>${safe(key)}</dt>`+
+        `<dd>${safe(value)}</dd>`+
+        "</div>"
+      );
+    }
+    function setGraphView(view){
+      graphState.view=(view==="table"||view==="json")?view:"graph";
+      const views=["graph","table","json"];
+      for(const key of views){
+        qs(`graph_tab_${key}`).classList.toggle("active",key===graphState.view);
+        qs(`graph_view_${key}`).classList.toggle("hidden",key!==graphState.view);
+      }
+    }
+    const SVG_NS="http://www.w3.org/2000/svg";
+    function svgEl(tag,attrs={}){
+      const el=document.createElementNS(SVG_NS,tag);
+      for(const [k,v] of Object.entries(attrs)){
+        el.setAttribute(k,String(v));
+      }
+      return el;
+    }
+    const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
+    function updateGraphStageMeta(){
+      const scalePct=Math.round((graphState.transform?.scale||1)*100);
+      qs("graph_stage_meta").textContent=`${graphState.nodes.length} nodes · ${graphState.rows.length} edges · ${scalePct}%`;
+    }
+    function applyGraphViewportTransform(){
+      const viewport=qs("graph_viewport");
+      if(!viewport)return;
+      const tr=graphState.transform||{scale:1,tx:0,ty:0};
+      viewport.setAttribute("transform",`translate(${tr.tx} ${tr.ty}) scale(${tr.scale})`);
+      updateGraphStageMeta();
+    }
+    function resetGraphTransform(){
+      graphState.transform={scale:1,tx:0,ty:0};
+      applyGraphViewportTransform();
+    }
+    function graphPointFromClient(svg,clientX,clientY){
+      const pt=svg.createSVGPoint();
+      pt.x=clientX;
+      pt.y=clientY;
+      const matrix=svg.getScreenCTM();
+      if(!matrix)return {x:0,y:0};
+      const mapped=pt.matrixTransform(matrix.inverse());
+      return {x:mapped.x,y:mapped.y};
+    }
+    function zoomGraphAt(svg,delta,anchorX,anchorY){
+      const tr=graphState.transform||{scale:1,tx:0,ty:0};
+      const oldScale=tr.scale;
+      const nextScale=clamp(delta>0?oldScale*1.12:oldScale*0.9,0.55,2.5);
+      if(Math.abs(nextScale-oldScale)<0.001)return;
+      const wx=(anchorX-tr.tx)/oldScale;
+      const wy=(anchorY-tr.ty)/oldScale;
+      tr.scale=nextScale;
+      tr.tx=anchorX-wx*nextScale;
+      tr.ty=anchorY-wy*nextScale;
+      graphState.transform=tr;
+      applyGraphViewportTransform();
+    }
+    function edgeStrokeByConfidence(score){
+      const s=clamp(Number(score)||0,0,1);
+      if(s>=0.82)return "#0f766e";
+      if(s>=0.58)return "#0284c7";
+      if(s>=0.45)return "#64748b";
+      return "#94a3b8";
+    }
+    function canPlaceEdgeLabel(points,x,y,minDist=34){
+      for(const p of points){
+        const dx=p.x-x;
+        const dy=p.y-y;
+        if((dx*dx+dy*dy)<(minDist*minDist))return false;
+      }
+      points.push({x,y});
+      return true;
+    }
+    function getGraphNodes(rows){
+      const map=new Map();
+      const bump=(name,isOut)=>{
+        const key=String(name||"-");
+        const item=map.get(key)||{name:key,total:0,incoming:0,outgoing:0};
+        item.total+=1;
+        if(isOut)item.outgoing+=1;
+        else item.incoming+=1;
+        map.set(key,item);
+      };
+      for(const row of rows){
+        bump(row.subject,true);
+        bump(row.obj,false);
+      }
+      return Array.from(map.values()).sort((a,b)=>b.total-a.total||a.name.localeCompare(b.name));
+    }
+    function buildGraphLayout(nodes,width,height){
+      const map=new Map();
+      if(!nodes.length)return map;
+      const cx=width/2;
+      const cy=height/2;
+      if(nodes.length===1){
+        map.set(nodes[0].name,{x:cx,y:cy});
+        return map;
+      }
+      const primary=nodes[0];
+      map.set(primary.name,{x:cx,y:cy});
+      const others=nodes.slice(1);
+      const ringCaps=[10,16,24];
+      const baseR=Math.max(140,Math.min(width,height)*0.23);
+      let cursor=0;
+      for(let ring=0;ring<ringCaps.length && cursor<others.length;ring++){
+        const count=Math.min(ringCaps[ring],others.length-cursor);
+        const rx=Math.max(120,baseR + ring*84);
+        const ry=Math.max(110,baseR*0.76 + ring*68);
+        for(let i=0;i<count;i++){
+          const node=others[cursor+i];
+          const t=((Math.PI*2*i)/Math.max(1,count)) + (ring*0.28);
+          const jitter=(i%2===0?1:-1)*Math.min(22,Math.sqrt(node.total)*4);
+          map.set(node.name,{
+            x:cx+Math.cos(t)*(rx+jitter),
+            y:cy+Math.sin(t)*(ry+jitter*0.45),
+          });
+        }
+        cursor+=count;
+      }
+      for(let i=cursor;i<others.length;i++){
+        const t=(Math.PI*2*(i-cursor))/Math.max(1,others.length-cursor);
+        const far=baseR+ringCaps.length*96;
+        map.set(others[i].name,{
+          x:cx+Math.cos(t)*far,
+          y:cy+Math.sin(t)*far*0.72,
+        });
+      }
+      return map;
+    }
+    function edgePairStats(rows){
+      const total=new Map();
+      for(const edge of rows){
+        const key=[edge.subject,edge.obj].sort().join("::");
+        total.set(key,(total.get(key)||0)+1);
+      }
+      const used=new Map();
+      return {total,used};
+    }
+    function quadraticPoint(a,c,b,t){
+      const mt=1-t;
+      return mt*mt*a + 2*mt*t*c + t*t*b;
+    }
+    function renderGraphInspectorNode(node){
+      const panel=qs("graph_inspector");
+      if(!node){
+        panel.innerHTML=`<div class='tiny muted'>${safe(t("graph.inspector.empty"))}</div>`;
+        return;
+      }
+      panel.innerHTML=
+        "<div class='graph-kv'>"+
+        graphField("type","node")+
+        graphField("name",node.name)+
+        graphField("degree",String(node.total))+
+        graphField("incoming",String(node.incoming))+
+        graphField("outgoing",String(node.outgoing))+
+        "</div>";
+    }
+    function renderGraphInspectorEdge(edge){
+      const panel=qs("graph_inspector");
+      if(!edge){
+        panel.innerHTML=`<div class='tiny muted'>${safe(t("graph.inspector.empty"))}</div>`;
+        return;
+      }
+      panel.innerHTML=
+        "<div class='graph-kv'>"+
+        graphField("type","relationship")+
+        graphField("subject",edge.subject)+
+        graphField("relation",edge.relation)+
+        graphField("object",edge.obj)+
+        graphField("confidence",Number.isFinite(edge.confidence)?edge.confidence.toFixed(3):"0.000")+
+        graphField("timestamp",formatDateTime(edge.timestamp))+
+        graphField("event_id",edge.event_id)+
+        "</div>";
+    }
+    function syncGraphSelectionStyles(){
+      const activeNode=graphState.selectedNode;
+      const activeEdge=graphState.selectedEdgeIndex;
+      const edgeRow=activeEdge>=0?graphState.rows[activeEdge]:null;
+
+      qsa("#graph_nodes .node-pill").forEach((btn)=>{
+        const name=btn.getAttribute("data-node-name")||"";
+        btn.classList.toggle("active",!!activeNode&&name===activeNode);
+      });
+      qsa("#graph_edges .edge-item").forEach((row)=>{
+        const idx=Number(row.getAttribute("data-edge-index")||-1);
+        row.classList.toggle("active",idx===activeEdge);
+      });
+      qsa("#graph_svg .graph-node").forEach((g)=>{
+        const name=g.getAttribute("data-node-name")||"";
+        const isActive=!!activeNode&&name===activeNode;
+        const isNeighbor=!!edgeRow&&(name===edgeRow.subject||name===edgeRow.obj);
+        g.classList.toggle("active",isActive);
+        g.classList.toggle("neighbor",!isActive&&isNeighbor);
+      });
+      qsa("#graph_svg .graph-link").forEach((path)=>{
+        const idx=Number(path.getAttribute("data-edge-index")||-1);
+        const subject=path.getAttribute("data-subject")||"";
+        const obj=path.getAttribute("data-object")||"";
+        const nodeRelated=!!activeNode&&(subject===activeNode||obj===activeNode);
+        const edgeRelated=activeEdge>=0&&idx===activeEdge;
+        const highlighted=edgeRelated||nodeRelated;
+        path.classList.toggle("active",highlighted);
+        path.classList.toggle("muted",(!!activeNode||activeEdge>=0)&&!highlighted);
+      });
+    }
+    function selectGraphNode(name){
+      const key=String(name||"").trim();
+      if(!key)return;
+      graphState.selectedNode=key;
+      graphState.selectedEdgeIndex=-1;
+      syncGraphSelectionStyles();
+      renderGraphInspectorNode(graphState.graphNodeMap[key]||null);
+    }
+    function selectGraphEdge(idx){
+      const i=Number(idx);
+      if(!Number.isFinite(i)||i<0||i>=graphState.rows.length)return;
+      graphState.selectedEdgeIndex=i;
+      graphState.selectedNode="";
+      syncGraphSelectionStyles();
+      renderGraphInspectorEdge(graphState.rows[i]||null);
+    }
+    function zoomGraph(step){
+      const svg=qs("graph_svg");
+      if(!svg)return;
+      const vb=svg.viewBox.baseVal;
+      const cx=vb.x + vb.width/2;
+      const cy=vb.y + vb.height/2;
+      zoomGraphAt(svg,step,cx,cy);
+    }
+    function resetGraphView(){
+      resetGraphTransform();
+      syncGraphSelectionStyles();
+    }
+    function renderGraphSvg(rows,nodes){
+      const svg=qs("graph_svg");
+      const stage=qs("graph_stage");
+      const empty=qs("graph_empty");
+      if(!svg||!stage||!empty)return;
+      svg.replaceChildren();
+      if(!nodes.length||!rows.length){
+        empty.classList.remove("hidden");
+        svg.onclick=null;
+        svg.onwheel=null;
+        svg.onpointerdown=null;
+        svg.onpointermove=null;
+        svg.onpointerup=null;
+        svg.onpointerleave=null;
+        svg.style.cursor="default";
+        graphState.transform={scale:1,tx:0,ty:0};
+        updateGraphStageMeta();
+        return;
+      }
+      empty.classList.add("hidden");
+      svg.style.cursor="grab";
+      const width=Math.max(560,Math.floor(stage.clientWidth)-14);
+      const height=Math.max(440,Math.floor(stage.clientHeight)-54);
+      svg.setAttribute("viewBox",`0 0 ${width} ${height}`);
+      svg.setAttribute("preserveAspectRatio","xMidYMid meet");
+
+      const defs=svgEl("defs");
+      const marker=svgEl("marker",{
+        id:"graph_arrow",
+        viewBox:"0 0 10 10",
+        refX:"9",
+        refY:"5",
+        markerWidth:"7",
+        markerHeight:"7",
+        orient:"auto-start-reverse",
+      });
+      marker.appendChild(svgEl("path",{d:"M 0 0 L 10 5 L 0 10 z",fill:"#94a3b8"}));
+      defs.appendChild(marker);
+      svg.appendChild(defs);
+
+      const viewport=svgEl("g",{id:"graph_viewport"});
+      const edgesLayer=svgEl("g",{"aria-label":"edges"});
+      const labelsLayer=svgEl("g",{"aria-label":"edge-labels"});
+      const nodesLayer=svgEl("g",{"aria-label":"nodes"});
+      const posMap=buildGraphLayout(nodes,width,height);
+      const pair=edgePairStats(rows);
+      const labelPoints=[];
+      const showEdgeLabels = rows.length <= 36;
+
+      rows.forEach((edge,idx)=>{
+        const a=posMap.get(edge.subject);
+        const b=posMap.get(edge.obj);
+        if(!a||!b)return;
+        const key=[edge.subject,edge.obj].sort().join("::");
+        const total=pair.total.get(key)||1;
+        const used=pair.used.get(key)||0;
+        pair.used.set(key,used+1);
+        const bend=(used-(total-1)/2)*24;
+        const dx=b.x-a.x;
+        const dy=b.y-a.y;
+        const len=Math.max(1,Math.hypot(dx,dy));
+        const nx=-dy/len;
+        const ny=dx/len;
+        const cx=(a.x+b.x)/2 + nx*bend;
+        const cy=(a.y+b.y)/2 + ny*bend;
+        const conf=clamp(Number(edge.confidence)||0,0,1);
+        const d=`M ${a.x} ${a.y} Q ${cx} ${cy} ${b.x} ${b.y}`;
+        const path=svgEl("path",{
+          d,
+          class:"graph-link",
+          "data-edge-index":idx,
+          "data-subject":edge.subject,
+          "data-object":edge.obj,
+          stroke:edgeStrokeByConfidence(conf),
+          "stroke-width":(1.05 + conf*1.5).toFixed(2),
+          "marker-end":"url(#graph_arrow)",
+        });
+        path.addEventListener("click",(ev)=>{
+          ev.stopPropagation();
+          selectGraphEdge(idx);
+        });
+        edgesLayer.appendChild(path);
+
+        const tx=quadraticPoint(a.x,cx,b.x,0.5);
+        const ty=quadraticPoint(a.y,cy,b.y,0.5)-4;
+        if(showEdgeLabels && canPlaceEdgeLabel(labelPoints,tx,ty,34)){
+          labelsLayer.appendChild(svgEl("text",{
+            x:tx,
+            y:ty,
+            "text-anchor":"middle",
+            class:"graph-link-label",
+          })).textContent=edge.relation;
+        }
+      });
+
+      nodes.forEach((node,index)=>{
+        const p=posMap.get(node.name);
+        if(!p)return;
+        const isRoot=index===0;
+        const g=svgEl("g",{class:`graph-node${isRoot?" root":""}`,"data-node-name":node.name});
+        const radius=Math.max(16,Math.min(34,14+Math.sqrt(node.total)*4.2+(node.outgoing>node.incoming?1:0)));
+        g.appendChild(svgEl("circle",{cx:p.x,cy:p.y,r:radius}));
+        g.appendChild(svgEl("title")).textContent=`${node.name} | degree ${node.total}`;
+        const text=svgEl("text",{x:p.x,y:p.y+4,"text-anchor":"middle"});
+        text.textContent=node.name.length>10?`${node.name.slice(0,10)}…`:node.name;
+        g.appendChild(text);
+        g.addEventListener("click",(ev)=>{
+          ev.stopPropagation();
+          selectGraphNode(node.name);
+        });
+        nodesLayer.appendChild(g);
+      });
+
+      viewport.appendChild(edgesLayer);
+      viewport.appendChild(labelsLayer);
+      viewport.appendChild(nodesLayer);
+      svg.appendChild(viewport);
+
+      graphState.drag={active:false,lastX:0,lastY:0,moved:false};
+      resetGraphTransform();
+      svg.onwheel=(ev)=>{
+        ev.preventDefault();
+        const anchor=graphPointFromClient(svg,ev.clientX,ev.clientY);
+        zoomGraphAt(svg,ev.deltaY,anchor.x,anchor.y);
+      };
+      svg.onpointerdown=(ev)=>{
+        if(!(ev.target instanceof Element))return;
+        if(ev.target.closest(".graph-node,.graph-link,.graph-link-label"))return;
+        graphState.drag={active:true,lastX:ev.clientX,lastY:ev.clientY,moved:false};
+        svg.style.cursor="grabbing";
+        try{svg.setPointerCapture(ev.pointerId);}catch{}
+      };
+      svg.onpointermove=(ev)=>{
+        if(!graphState.drag?.active)return;
+        const dx=ev.clientX-graphState.drag.lastX;
+        const dy=ev.clientY-graphState.drag.lastY;
+        graphState.drag.lastX=ev.clientX;
+        graphState.drag.lastY=ev.clientY;
+        if(Math.abs(dx)+Math.abs(dy)>1)graphState.drag.moved=true;
+        const vb=svg.viewBox.baseVal;
+        const ux=vb.width/Math.max(1,svg.clientWidth);
+        const uy=vb.height/Math.max(1,svg.clientHeight);
+        graphState.transform.tx += dx*ux;
+        graphState.transform.ty += dy*uy;
+        applyGraphViewportTransform();
+      };
+      svg.onpointerup=(ev)=>{
+        if(graphState.drag?.active && graphState.drag?.moved){
+          graphState.drag.active=false;
+          svg.style.cursor="grab";
+          return;
+        }
+        graphState.drag.active=false;
+        svg.style.cursor="grab";
+      };
+      svg.onpointerleave=()=>{
+        graphState.drag.active=false;
+        svg.style.cursor="grab";
+      };
+      svg.onclick=()=>{
+        if(graphState.drag?.moved){
+          graphState.drag.moved=false;
+          return;
+        }
+        graphState.selectedNode="";
+        graphState.selectedEdgeIndex=-1;
+        syncGraphSelectionStyles();
+        renderGraphInspectorNode(null);
+      };
+      syncGraphSelectionStyles();
+    }
+    function renderGraphResults(rows){
+      const safeRows=normalizeGraphRows(rows);
+      graphState.rows=safeRows;
+      graphState.selectedNode="";
+      graphState.selectedEdgeIndex=-1;
+      qs("graph_result_meta").textContent=`${safeRows.length} rows`;
+
+      const nodes=getGraphNodes(safeRows);
+      graphState.nodes=nodes;
+      graphState.graphNodeMap=Object.fromEntries(nodes.map((x)=>[x.name,x]));
+      updateGraphStageMeta();
+      qs("graph_nodes").innerHTML=nodes.length
+        ? nodes.map((node,idx)=>(
+          `<button class='node-pill' type='button' data-node-index='${idx}' data-node-name='${safe(node.name)}'>${safe(node.name)} (${node.total})</button>`
+        )).join("")
+        : `<div class='tiny muted'>${safe(t("graph.status.empty"))}</div>`;
+
+      qs("graph_edges").innerHTML=safeRows.length
+        ? safeRows.map((edge,idx)=>(
+          `<article class='edge-item' data-edge-index='${idx}' role='button' tabindex='0'>`+
+          `<div class='edge-main'>${safe(edge.subject)} -[${safe(edge.relation)}]-> ${safe(edge.obj)}</div>`+
+          `<div class='tiny muted'>conf: ${Number.isFinite(edge.confidence)?edge.confidence.toFixed(3):"0.000"} · ${safe(formatDateTime(edge.timestamp))}</div>`+
+          "</article>"
+        )).join("")
+        : `<div class='tiny muted'>${safe(t("graph.status.empty"))}</div>`;
+
+      qs("graph_table_body").innerHTML=safeRows.length
+        ? safeRows.map((edge)=>(
+          "<tr>"+
+          `<td>${safe(edge.subject)}</td>`+
+          `<td>${safe(edge.relation)}</td>`+
+          `<td>${safe(edge.obj)}</td>`+
+          `<td>${Number.isFinite(edge.confidence)?edge.confidence.toFixed(3):"0.000"}</td>`+
+          `<td>${safe(formatDateTime(edge.timestamp))}</td>`+
+          `<td>${safe(edge.event_id)}</td>`+
+          "</tr>"
+        )).join("")
+        : "<tr><td colspan='6' class='tiny muted'>No rows</td></tr>";
+
+      qs("graph_view_json").textContent=JSON.stringify({items:safeRows,total_count:safeRows.length},null,2);
+      renderGraphInspectorNode(null);
+      renderGraphSvg(safeRows,nodes);
+      setGraphView(graphState.view);
+    }
+    async function runGraphQuery(){
+      const btn=qs("btn_graph_run");
+      const mode=qs("graph_mode").value||"search";
+      const query=qs("graph_editor").value.trim();
+      if(!query){
+        setGraphStatus("query is required",false);
+        return;
+      }
+      graphState.mode=mode;
+      const limit=Math.max(1,Math.min(100,Number(qs("graph_limit").value||20)));
+      buttonBusy(btn,true,t("graph.status.running"));
+      setGraphStatus(t("graph.status.running"));
+      try{
+        const url=new URL(mode==="neighbors"?"/api/v1/graph/neighbors":"/api/v1/graph/search",location.origin);
+        if(mode==="neighbors"){
+          url.searchParams.set("entity",query);
+        }else{
+          url.searchParams.set("query",query);
+        }
+        url.searchParams.set("user_id",auth.username);
+        url.searchParams.set("group_id",auth.groupId);
+        url.searchParams.set("limit",String(limit));
+        const data=await api(url.pathname+url.search);
+        const rows=normalizeGraphRows(data?.result?.items);
+        renderGraphResults(rows);
+        setGraphStatus(`${t("graph.status.loaded")} ${rows.length} rows`);
+        setGlobalStatus("graph query completed");
+      }catch(err){
+        setGraphStatus(String(err.message||"graph failed"),false);
+        setGlobalStatus("graph query failed",false);
+      }finally{
+        buttonBusy(btn,false);
+      }
+    }
+    function clearGraphPanel(){
+      qs("graph_editor").value="";
+      graphState.rows=[];
+      renderGraphResults([]);
+      setGraphStatus(t("graph.status.ready"));
+    }
+    function useGraphExample(mode,query){
+      qs("graph_mode").value=mode;
+      syncGraphEditorPlaceholder();
+      qs("graph_editor").value=query;
+      runGraphQuery();
+    }
+
+    async function loadModelConfig(){
+      const btn=qs("btn_cfg_load");
+      buttonBusy(btn,true);
+      try{
+        const data=await api("/api/v1/model-config");
+        const cfg=normalizeModelConfig(data.result||{});
+        state.modelConfig=cfg;
+        qs("cfg_chat_provider").value=cfg.chat_provider||DEFAULT_CHAT_PROVIDER;
+        qs("cfg_chat_model").value=cfg.chat_model||"";
+        qs("cfg_chat_base_url").value=cfg.chat_base_url||"";
+        qs("cfg_chat_api_key").value=cfg.chat_api_key||"";
+        qs("cfg_embedding_provider").value=cfg.embedding_provider||"openai";
+        qs("cfg_embed_base_url").value=cfg.embedding_base_url||"";
+        qs("cfg_embed_api_key").value=cfg.embedding_api_key||"";
+        qs("cfg_embed_model").value=cfg.embedding_model||"";
+        qs("cfg_extractor_provider").value=cfg.extractor_provider||"chat_model";
+        qs("cfg_extractor_base_url").value=cfg.extractor_base_url||"";
+        qs("cfg_extractor_api_key").value=cfg.extractor_api_key||"";
+        qs("cfg_extractor_model").value=cfg.extractor_model||"";
+        renderConfigProviderEditors(cfg.chat_provider);
+        alignSessionsWithProviderConfig();
+        renderSessions();
+        renderChat();
+        setConfigStatus("配置已加载");
+        setGlobalStatus("model config loaded");
+      }catch(err){
+        setConfigStatus(String(err.message||"加载失败"),false);
+        setGlobalStatus("load config failed",false);
+      }finally{
+        buttonBusy(btn,false);
+      }
+    }
+    async function saveModelConfig(){
+      const btn=qs("btn_cfg_save");
+      buttonBusy(btn,true);
+      try{
+        applyProviderEditor();
+        const chatProvider=ensureProviderOption(qs("cfg_chat_provider").value||DEFAULT_CHAT_PROVIDER);
+        const payload={
+          chat_provider:chatProvider,
+          chat_base_url:qs("cfg_chat_base_url").value.trim(),
+          chat_api_key:qs("cfg_chat_api_key").value.trim(),
+          chat_model:qs("cfg_chat_model").value.trim(),
+          embedding_provider:qs("cfg_embedding_provider").value.trim()||"openai",
+          embedding_base_url:qs("cfg_embed_base_url").value.trim(),
+          embedding_api_key:qs("cfg_embed_api_key").value.trim(),
+          embedding_model:qs("cfg_embed_model").value.trim(),
+          extractor_provider:qs("cfg_extractor_provider").value.trim()||"chat_model",
+          extractor_base_url:qs("cfg_extractor_base_url").value.trim(),
+          extractor_api_key:qs("cfg_extractor_api_key").value.trim(),
+          extractor_model:qs("cfg_extractor_model").value.trim(),
+          chat_provider_options:state.modelConfig.chat_provider_options
+        };
+        state.modelConfig.chat_provider_options[chatProvider]={
+          base_url:payload.chat_base_url,
+          api_key:payload.chat_api_key,
+          model:payload.chat_model
+        };
+        const data=await api("/api/v1/model-config",{method:"PUT",body:payload});
+        state.modelConfig.chat_provider=chatProvider;
+        state.modelConfig.chat_base_url=payload.chat_base_url;
+        state.modelConfig.chat_api_key=payload.chat_api_key;
+        state.modelConfig.chat_model=payload.chat_model;
+        state.modelConfig.embedding_provider=payload.embedding_provider;
+        state.modelConfig.embedding_base_url=payload.embedding_base_url;
+        state.modelConfig.embedding_api_key=payload.embedding_api_key;
+        state.modelConfig.embedding_model=payload.embedding_model;
+        state.modelConfig.extractor_provider=payload.extractor_provider;
+        state.modelConfig.extractor_base_url=payload.extractor_base_url;
+        state.modelConfig.extractor_api_key=payload.extractor_api_key;
+        state.modelConfig.extractor_model=payload.extractor_model;
+        renderConfigProviderEditors(chatProvider);
+        alignSessionsWithProviderConfig();
+        renderSessions();
+        renderChat();
+        setConfigStatus(`配置已保存（chat:${chatProvider} / embed:${payload.embedding_provider} / extractor:${payload.extractor_provider}）`);
+        setGlobalStatus("model config saved");
+      }catch(err){
+        setConfigStatus(String(err.message||"保存失败"),false);
+        setGlobalStatus("save config failed",false);
+      }finally{
+        buttonBusy(btn,false);
+      }
+    }
+    async function testModelConfig(){
+      const btn=qs("btn_cfg_test");
+      buttonBusy(btn,true);
+      try{
+        const data=await api("/api/v1/model-config/test",{method:"POST",body:{}});
+        const reachable=Boolean(data?.result?.reachable);
+        const extractorReachable=Boolean(data?.result?.extractor_reachable);
+        const allOk=reachable&&extractorReachable;
+        setConfigStatus(
+          allOk
+            ? "连通性测试通过（chat+extractor）"
+            : `连通性测试失败（chat:${reachable?"ok":"fail"} / extractor:${extractorReachable?"ok":"fail"}）`,
+          allOk
+        );
+        setGlobalStatus(allOk?"connectivity test passed":"connectivity test failed",allOk);
+      }catch(err){
+        setConfigStatus(String(err.message||"测试失败"),false);
+        setGlobalStatus("connectivity test failed",false);
+      }finally{
+        buttonBusy(btn,false);
+      }
+    }
+    function applyFormDefaults(){
+      qsa("input,select,textarea").forEach((el)=>{
+        if(!el.name&&el.id)el.name=el.id;
+        if(el.tagName==="INPUT"&&!el.getAttribute("autocomplete"))el.setAttribute("autocomplete","off");
+      });
+    }
+
+    function bindEvents(){
+      qsa(".nav-btn").forEach((btn)=>btn.addEventListener("click",()=>switchPage(btn.dataset.page)));
+      qs("login_form").addEventListener("submit",(e)=>{
+        e.preventDefault();
+        const u=qs("login_username").value.trim();
+        const p=qs("login_password").value;
+        const status=qs("login_status");
+        if(!u||!p){status.innerHTML="<span class='err'>请输入用户名和密码</span>";return;}
+        if(!verifyUser(u,p)){status.innerHTML="<span class='err'>用户名或密码错误</span>";return;}
+        auth.username=u;
+        auth.groupId=auth.groupId||DEFAULT_GROUP_ID;
+        saveAuth();
+        showApp();
+        bootstrapAfterLogin();
+      });
+      qs("btn_logout").addEventListener("click",()=>{
+        clearAuth();
+        state.sessions=[];
+        state.activeId=null;
+        showLogin();
+      });
+      qs("btn_new_session").addEventListener("click",()=>{
+        const created=makeNewSession();
+        state.sessions.unshift(created);
+        saveSessions();
+        activateSession(created.id,{switchToChat:true});
+      });
+      qs("chat_provider").addEventListener("change",(e)=>setSessionProvider(e.target.value));
+      qs("chat_form").addEventListener("submit",(e)=>{e.preventDefault();sendChat()});
+      qs("chat_query").addEventListener("keydown",(e)=>{if((e.ctrlKey||e.metaKey)&&e.key==="Enter"){e.preventDefault();sendChat()}});
+      qs("chat_log").addEventListener("click",(e)=>{
+        if(!(e.target instanceof Element))return;
+        const btn=e.target.closest("button[data-citation-toggle]");
+        if(!btn)return;
+        const idx=Number(btn.getAttribute("data-citation-toggle")||-1);
+        const sess=activeSession();
+        if(!sess||idx<0||idx>=(sess.messages||[]).length)return;
+        const panel=btn.parentElement?.querySelector("[data-citation-panel]");
+        if(!(panel instanceof HTMLElement))return;
+        const open=panel.classList.contains("hidden");
+        if(open&&!panel.dataset.loaded){
+          const citations=(sess.messages[idx]?.citations)||[];
+          panel.innerHTML=renderCitationPanelHtml(citations);
+          panel.dataset.loaded="1";
+        }
+        panel.classList.toggle("hidden",!open);
+        btn.setAttribute("aria-expanded",open?"true":"false");
+      });
+
+      qs("btn_ingest").addEventListener("click",ingestMemory);
+      qs("btn_ingest_clear").addEventListener("click",()=>{
+        qs("ingest_content").value="";
+        setIngestStatus("");
+        resetIngestPanels();
+      });
+      qs("btn_manage_fetch").addEventListener("click",manageFetch);
+      qs("btn_manage_search").addEventListener("click",manageSearch);
+      qs("manage_list").addEventListener("click",(e)=>{
+        if(!(e.target instanceof Element))return;
+        const target=e.target.closest("button[data-event-id]");
+        if(!target)return;
+        deleteByEventId(target.dataset.eventId,target);
+      });
+      qs("btn_graph_run").addEventListener("click",runGraphQuery);
+      qs("btn_graph_clear").addEventListener("click",clearGraphPanel);
+      qs("btn_graph_zoom_in").addEventListener("click",()=>zoomGraph(1));
+      qs("btn_graph_zoom_out").addEventListener("click",()=>zoomGraph(-1));
+      qs("btn_graph_zoom_reset").addEventListener("click",resetGraphView);
+      qs("graph_mode").addEventListener("change",syncGraphEditorPlaceholder);
+      qs("graph_editor").addEventListener("keydown",(e)=>{
+        if(e.key==="Enter"&&e.shiftKey){
+          e.preventDefault();
+          runGraphQuery();
+        }
+      });
+      qsa(".example-btn").forEach((btn)=>{
+        btn.addEventListener("click",()=>useGraphExample(btn.dataset.mode||"search",btn.dataset.query||""));
+      });
+      qsa(".graph-tab").forEach((btn)=>{
+        btn.addEventListener("click",()=>setGraphView(btn.dataset.view||"graph"));
+      });
+      qs("graph_nodes").addEventListener("click",(e)=>{
+        if(!(e.target instanceof Element))return;
+        const btn=e.target.closest("button[data-node-index]");
+        if(!btn)return;
+        const idx=Number(btn.getAttribute("data-node-index")||-1);
+        if(idx<0||idx>=graphState.nodes.length)return;
+        const node=graphState.nodes[idx];
+        selectGraphNode(node.name);
+      });
+      qs("graph_edges").addEventListener("click",(e)=>{
+        if(!(e.target instanceof Element))return;
+        const row=e.target.closest("[data-edge-index]");
+        if(!row)return;
+        const idx=Number(row.getAttribute("data-edge-index")||-1);
+        if(idx<0||idx>=graphState.rows.length)return;
+        selectGraphEdge(idx);
+      });
+      qs("graph_edges").addEventListener("keydown",(e)=>{
+        if(!(e.target instanceof Element))return;
+        if(e.key!=="Enter"&&e.key!==" ")return;
+        const row=e.target.closest("[data-edge-index]");
+        if(!row)return;
+        e.preventDefault();
+        row.click();
+      });
+
+      qs("cfg_chat_provider").addEventListener("change",(e)=>loadProviderEditor(e.target.value));
+      qs("btn_cfg_load").addEventListener("click",loadModelConfig);
+      qs("btn_cfg_save").addEventListener("click",saveModelConfig);
+      qs("btn_cfg_test").addEventListener("click",testModelConfig);
+      qs("ui_language").addEventListener("change",(e)=>setLanguage(e.target.value));
+    }
+
+    function bootstrapAfterLogin(){
+      renderAuth();
+      loadSessions();
+      ensureSession();
+      renderSessions();
+      renderChat();
+      setIngestStatus("");
+      resetIngestPanels();
+      setManageStatus("");
+      renderManageList([]);
+      renderConflictList([]);
+      renderGraphResults([]);
+      syncGraphEditorPlaceholder();
+      setGraphStatus(t("graph.status.ready"));
+      setConfigStatus("");
+      switchPage("chat");
+      loadModelConfig();
+      setGlobalStatus("ready");
+    }
+
+    seedDefaultUsers();
+    loadLang();
+    applyFormDefaults();
+    bindEvents();
+    renderConfigProviderEditors(DEFAULT_CHAT_PROVIDER);
+    renderProviderSelect("chat_provider",DEFAULT_CHAT_PROVIDER);
+    applyLanguage();
+    if(loadAuth()){
+      showApp();
+      bootstrapAfterLogin();
+    }else{
+      showLogin();
+    }
+  </script>
+</body>
+</html>
+

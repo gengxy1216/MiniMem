@@ -1,0 +1,36 @@
+name: Feature Request
+description: Propose a new feature or improvement for MiniMem
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What problem are you trying to solve?
+      placeholder: Describe the user pain clearly.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed Solution
+      description: Describe your expected behavior and API/UI impact.
+      placeholder: Include acceptance criteria if possible.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: What alternatives did you evaluate?
+      placeholder: Optional
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context
+      description: Links, references, screenshots, or prior art.
+      placeholder: Optional

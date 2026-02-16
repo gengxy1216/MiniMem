@@ -1,0 +1,2 @@
+{"case_id":"persona-1","user_id":"zhangming","group_id":"g-family","question":"我儿子叫什么？我春节去哪儿了？","expected_keywords":["团团","三亚"],"memories":[{"message_id":"c1","content":"我的儿子是团团，很聪明，很健康，是个阳光男孩"},{"message_id":"c2","content":"我春节去三亚"}]}
+{"case_id":"work-1","user_id":"zhangming","group_id":"g-work","question":"帮我写一段给领导的拜年短信，风格按我的偏好。","expected_keywords":["领导","正式","拜年"],"memories":[{"message_id":"w1","content":"我要给领导准备拜年短信，风格简洁正式"},{"message_id":"w2","content":"我春节在三亚，想表达感谢支持与指导"}]}
