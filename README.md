@@ -20,9 +20,11 @@ MiniMem is a lightweight, local-first long-term memory system designed for AI ag
 
 ### One-click Install
 
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts/install.ps1 -RunAfterInstall
-```
+| Platform | Command |
+|----------|---------|
+| 🪟 **Windows** | `powershell -ExecutionPolicy Bypass -File scripts/install.ps1 -RunAfterInstall` |
+| 🐧 **Linux** | `bash scripts/install.sh --run` |
+| 🍎 **macOS** | `bash scripts/install.sh --run` |
 
 Or use the launcher:
 
@@ -48,6 +50,8 @@ Open your browser:
 ```
 http://127.0.0.1:20195/ui
 ```
+
+> 🔐 **Default Credentials**: `admin` / `admin123`
 
 ## Features 🎯
 
