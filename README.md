@@ -134,8 +134,8 @@ LITE_RETRIEVAL_PROFILE=balanced
 
 MiniMem builds on the shoulders of giants ❤️
 
-- **[EverMemOs](https://github.com/Any机器人/**)** - Original inspiration for agent memory systems
-- **[Kuzu](https://kuzudb.com/)** - High-performance embedded graph database
+- **[EverMemOs](https://github.com/EverMind-AI/EverMemOS**)** - Original inspiration for agent memory systems
+- **[Kuzu](https://github.com/kuzudb/kuzu)** - High-performance embedded graph database
 - **[LanceDB](https://lancedb.com/)** - Developer-friendly vector database
 - **[SQLite](https://www.sqlite.org/)** - The most used database in the world
 
