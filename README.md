@@ -18,6 +18,12 @@ MiniMem is a lightweight, local-first long-term memory system designed for AI ag
 
 ## Quick Start ⚡
 
+### 3-layer memory
+L0-text
+L1-vector
+L2-graph
+agentic decide
+
 ### One-click Install
 
 | Platform | Command |
