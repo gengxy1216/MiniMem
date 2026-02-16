@@ -65,6 +65,8 @@ http://127.0.0.1:20195/ui
 
 ## API Overview 📡
 
+> For complete API documentation, see [API Reference](docs/api-reference.md)
+
 ```bash
 # Health check
 GET /health
@@ -127,6 +129,15 @@ LITE_RETRIEVAL_PROFILE=balanced
 - **SQLite** - Local structured data
 - **LanceDB** - High-performance vector database
 - **Kuzu** - Fast embedded graph database
+
+## Acknowledgments 🙏
+
+MiniMem builds on the shoulders of giants ❤️
+
+- **[EverMemOs](https://github.com/Any机器人/**)** - Original inspiration for agent memory systems
+- **[Kuzu](https://kuzudb.com/)** - High-performance embedded graph database
+- **[LanceDB](https://lancedb.com/)** - Developer-friendly vector database
+- **[SQLite](https://www.sqlite.org/)** - The most used database in the world
 
 ## License 📄
 
