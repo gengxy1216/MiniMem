@@ -26,9 +26,12 @@ from evermemos_lite.infra.sqlite.init_schema import init_schema
 from evermemos_lite.infra.vector.lancedb_store import LanceVectorStore
 from evermemos_lite.service.chat_responder import ChatResponder
 from evermemos_lite.service.extractor_factory import build_memory_extractor
+from evermemos_lite.service.formation_enhancer import ChatModelFormationEnhancer
 from evermemos_lite.service.memory_service import MemoryService
 from evermemos_lite.service.openai_embedding import OpenAIEmbeddingProvider
 from evermemos_lite.service.policy_resolver import PolicyResolver
+from evermemos_lite.service.query_rewriter import ChatModelQueryRewriter
+from evermemos_lite.service.retrieval_verifier import ChatModelRetrievalVerifier
 from evermemos_lite.service.retrieval_mode_selector import (
     OpenAIRetrievalModeSelector,
     RuleRetrievalModeSelector,
@@ -125,7 +128,7 @@ def create_app(settings: LiteSettings) -> FastAPI:
     policy_resolver = PolicyResolver(runtime_policy_repo)
     request_status_repo = RequestStatusRepository(engine)
     conversation_meta_repo = ConversationMetaRepository(engine)
-    profile = PROFILE_PRESETS.get(settings.retrieval_profile, PROFILE_PRESETS["medium"])
+    profile = PROFILE_PRESETS.get(settings.retrieval_profile, PROFILE_PRESETS["agentic"])
     if runtime_model_config["embedding_provider"] != "openai":
         raise ValueError("Only openai-compatible embedding provider is supported")
     embedding_provider = OpenAIEmbeddingProvider(
@@ -137,9 +140,57 @@ def create_app(settings: LiteSettings) -> FastAPI:
     extractor = build_memory_extractor(
         settings=settings, runtime_model_config=runtime_model_config
     )
+    phase1_base_url = str(
+        runtime_model_config.get("extractor_base_url")
+        or runtime_model_config.get("chat_base_url")
+        or settings.extractor_base_url
+        or settings.chat_base_url
+    ).strip()
+    phase1_api_key = str(
+        runtime_model_config.get("extractor_api_key")
+        or runtime_model_config.get("chat_api_key")
+        or settings.extractor_api_key
+        or settings.chat_api_key
+    ).strip()
+    phase1_model = str(
+        runtime_model_config.get("extractor_model")
+        or runtime_model_config.get("chat_model")
+        or settings.extractor_model
+        or settings.chat_model
+    ).strip()
+    formation_enhancer = ChatModelFormationEnhancer(
+        base_url=phase1_base_url,
+        api_key=phase1_api_key,
+        model=phase1_model,
+        enabled=settings.phase1_enabled,
+        boundary_enabled=settings.phase1_semantic_boundary_enabled,
+        narrative_enabled=settings.phase1_narrative_enabled,
+    )
+    retrieval_verifier = ChatModelRetrievalVerifier(
+        base_url=phase1_base_url,
+        api_key=phase1_api_key,
+        model=phase1_model,
+        enabled=settings.phase2_agentic_verifier_enabled,
+    )
+    query_rewriter = ChatModelQueryRewriter(
+        base_url=phase1_base_url,
+        api_key=phase1_api_key,
+        model=phase1_model,
+        enabled=settings.phase3_query_rewriter_enabled,
+    )
 
     vector_store = LanceVectorStore(
-        settings.lancedb_dir, vector_dim=max(8, profile.vector_dim or 384)
+        settings.lancedb_dir,
+        vector_dim=max(8, profile.vector_dim or 384),
+        use_lancedb=settings.vector_lancedb_enabled,
+        lance_persist_min_importance=settings.vector_lancedb_min_importance,
+        index_type=settings.vector_index_type,
+        index_metric=settings.vector_index_metric,
+        hnsw_m=settings.vector_index_m,
+        hnsw_ef_construction=settings.vector_index_ef_construction,
+        search_nprobes=settings.vector_search_nprobes,
+        search_ef=settings.vector_search_ef,
+        search_refine_factor=settings.vector_search_refine_factor,
     )
     graph_store = KuzuGraphStore(db_dir=settings.graph_dir, enabled=settings.graph_enabled)
     memory_service = MemoryService(
@@ -147,10 +198,32 @@ def create_app(settings: LiteSettings) -> FastAPI:
         vector_store,
         embedding_provider,
         extractor,
+        formation_enhancer=formation_enhancer,
+        semantic_boundary_min_confidence=settings.phase1_boundary_min_confidence,
+        retrieval_verifier=retrieval_verifier,
+        retrieval_verifier_min_confidence=settings.phase2_agentic_verifier_min_confidence,
+        query_rewriter=query_rewriter,
+        query_rewriter_min_confidence=settings.phase3_query_rewriter_min_confidence,
+        phase4_reasoning_enabled=settings.phase4_reasoning_enabled,
+        temporal_rerank_weight=settings.phase4_temporal_rerank_weight,
+        multi_hop_max_queries=settings.phase4_multi_hop_max_queries,
         graph_store=graph_store,
         graph_top_k=settings.graph_top_k,
         graph_write_min_importance=settings.graph_write_min_importance,
         key_memory_importance_threshold=settings.key_memory_importance_threshold,
+        vector_write_min_importance=settings.vector_write_min_importance,
+        vector_embed_chunk_chars=settings.vector_embed_chunk_chars,
+        vector_embed_max_chunks=settings.vector_embed_max_chunks,
+        search_budget_factor=settings.search_budget_factor,
+        search_min_probe_k=settings.search_min_probe_k,
+        keyword_confident_best_score=settings.keyword_confident_best_score,
+        keyword_confident_kth_score=settings.keyword_confident_kth_score,
+        semantic_vector_budget_cap=settings.semantic_vector_budget_cap,
+        semantic_keyword_budget_cap=settings.semantic_keyword_budget_cap,
+        query_embed_cache_size=settings.query_embed_cache_size,
+        query_embed_cache_ttl_sec=settings.query_embed_cache_ttl_sec,
+        search_trace_enabled=settings.search_trace_enabled,
+        search_trace_slow_ms=settings.search_trace_slow_ms,
     )
     chat_responder = ChatResponder(
         base_url=runtime_model_config["chat_base_url"],

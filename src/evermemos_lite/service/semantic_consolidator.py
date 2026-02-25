@@ -37,11 +37,17 @@ class SemanticConsolidator:
         *,
         clustering_threshold: float = 0.70,
         max_time_gap_days: int = 7,
+        profile_decay_half_life_days: int = 45,
+        profile_conflict_switch_margin: float = 0.12,
     ) -> None:
         self.repo = repo
         self.embedding_provider = embedding_provider
         self.clustering_threshold = max(0.0, min(1.0, float(clustering_threshold)))
         self.max_time_gap_sec = max(1, int(max_time_gap_days)) * 86400
+        self.profile_decay_half_life_days = max(1, int(profile_decay_half_life_days))
+        self.profile_conflict_switch_margin = max(
+            0.0, min(1.0, float(profile_conflict_switch_margin))
+        )
 
     def consolidate(self, payload: ConsolidateInput) -> dict[str, Any]:
         scene_text = (payload.summary or payload.episode or "").strip()
@@ -67,6 +73,7 @@ class SemanticConsolidator:
                 last_memory_ts=payload.timestamp,
             )
             memory_count_delta = 1
+            scene_memory_count = 1
         else:
             scene_id = str(scene.get("id"))
             prev_vec = self._safe_vector(scene.get("centroid_vector_json"))
@@ -83,6 +90,7 @@ class SemanticConsolidator:
                 last_memory_ts=payload.timestamp,
             )
             memory_count_delta = 1
+            scene_memory_count = max(1, old_count + 1)
 
         self.repo.update_memory_scene(
             memory_id=payload.memory_id,
@@ -95,6 +103,7 @@ class SemanticConsolidator:
             scene_id=scene_id,
             scene_summary=scene_summary,
             memory_count_delta=memory_count_delta,
+            scene_memory_count=scene_memory_count,
         )
         return {"scene_id": scene_id}
 
@@ -137,6 +146,7 @@ class SemanticConsolidator:
         scene_id: str,
         scene_summary: str,
         memory_count_delta: int,
+        scene_memory_count: int | None = None,
     ) -> None:
         prev = self.repo.get_latest_profile_snapshot(
             user_id=payload.user_id, group_id=payload.group_id
@@ -164,28 +174,82 @@ class SemanticConsolidator:
                 key = str(k).strip()
                 val = str(v).strip()
                 if key and val:
-                    extracted_explicit.setdefault(key, {"value": val, "timestamp": payload.timestamp})
+                    extracted_explicit[key] = {
+                        "value": val,
+                        "timestamp": payload.timestamp,
+                        "source": "profile_patch",
+                        "confidence": 0.88,
+                    }
 
+        updated_fields: list[str] = []
+        scene_count = max(1, int(scene_memory_count or memory_count_delta or 1))
         for field, new_obj in extracted_explicit.items():
+            normalized_new = self._normalize_explicit_obj(
+                field=field,
+                obj=new_obj,
+                scene_id=scene_id,
+                timestamp=payload.timestamp,
+                scene_memory_count=scene_count,
+            )
+            if not normalized_new:
+                continue
             old_obj = explicit.get(field)
             if old_obj and isinstance(old_obj, dict):
                 old_value = str(old_obj.get("value", "")).strip()
-                new_value = str(new_obj.get("value", "")).strip()
+                new_value = str(normalized_new.get("value", "")).strip()
+                if old_value and new_value and old_value == new_value:
+                    explicit[field] = self._merge_same_value(
+                        old_obj=old_obj,
+                        new_obj=normalized_new,
+                        scene_id=scene_id,
+                        timestamp=payload.timestamp,
+                    )
+                    updated_fields.append(field)
+                    continue
                 if old_value and new_value and old_value != new_value:
                     if self._is_time_varying_field(field):
                         explicit[field] = {
                             "value": new_value,
-                            "timestamp": int(new_obj.get("timestamp") or payload.timestamp),
+                            "timestamp": int(
+                                normalized_new.get("timestamp") or payload.timestamp
+                            ),
                             "previous_value": old_value,
                             "trend": self._calc_trend(old_value, new_value),
+                            "scene_id": scene_id,
+                            "source": str(normalized_new.get("source") or "scene_summary"),
+                            "confidence": float(
+                                normalized_new.get("confidence", 0.72)
+                            ),
+                            "decay_score": float(normalized_new.get("decay_score", 0.72)),
+                            "support_count": int(
+                                max(1, int(normalized_new.get("support_count", 1)))
+                            ),
+                            "scene_memory_count": int(
+                                max(1, int(normalized_new.get("scene_memory_count", scene_count)))
+                            ),
                         }
+                        updated_fields.append(field)
                     else:
+                        winner = self._pick_conflict_winner(
+                            old_obj=old_obj,
+                            new_obj=normalized_new,
+                            now_ts=payload.timestamp,
+                        )
+                        old_score = round(
+                            self._decayed_score(old_obj, now_ts=payload.timestamp), 4
+                        )
+                        new_score = round(
+                            self._decayed_score(normalized_new, now_ts=payload.timestamp), 4
+                        )
                         conflict = {
                             "field": field,
                             "old": old_value,
                             "new": new_value,
                             "timestamp": payload.timestamp,
                             "scene_id": scene_id,
+                            "winner": winner,
+                            "old_score": old_score,
+                            "new_score": new_score,
                         }
                         conflicts.append(conflict)
                         self.repo.insert_profile_conflict(
@@ -198,27 +262,51 @@ class SemanticConsolidator:
                             happened_at=payload.timestamp,
                             evidence_event_id=payload.event_id,
                         )
-                        if int(new_obj.get("timestamp") or payload.timestamp) >= int(
-                            old_obj.get("timestamp") or 0
-                        ):
-                            explicit[field] = new_obj
+                        if winner == "new":
+                            accepted = dict(normalized_new)
+                            accepted["previous_value"] = old_value
+                            accepted["replaced_at"] = payload.timestamp
+                            explicit[field] = accepted
+                            updated_fields.append(field)
+                        else:
+                            held = dict(old_obj)
+                            held["last_conflict_at"] = payload.timestamp
+                            held["last_conflict_scene_id"] = scene_id
+                            explicit[field] = held
             else:
-                explicit[field] = new_obj
+                explicit[field] = normalized_new
+                updated_fields.append(field)
 
         for item in extracted_implicit:
             if item and item not in implicit:
                 implicit.append(item)
         implicit = implicit[-12:]
         conflicts = conflicts[-24:]
+        scene_links = profile.get("scene_profile_links")
+        if not isinstance(scene_links, list):
+            scene_links = []
+        scene_links.append(
+            {
+                "scene_id": scene_id,
+                "timestamp": payload.timestamp,
+                "updated_fields": sorted(set(updated_fields)),
+                "scene_memory_count": scene_count,
+                "summary": scene_summary[:200],
+            }
+        )
+        scene_links = scene_links[-32:]
 
         profile["explicit_facts"] = explicit
         profile["implicit_traits"] = implicit
         profile["conflicts"] = conflicts
+        profile["scene_profile_links"] = scene_links
         profile["scene_stats"] = {
             "last_scene_id": scene_id,
             "last_scene_summary": scene_summary[:300],
             "updated_at": payload.timestamp,
             "memory_count_delta": memory_count_delta,
+            "scene_memory_count": scene_count,
+            "updated_fields": sorted(set(updated_fields)),
         }
         self.repo.upsert_profile_snapshot(
             event_id=payload.event_id,
@@ -278,6 +366,84 @@ class SemanticConsolidator:
             if any(k in raw for k in keys):
                 traits.append(trait)
         return traits
+
+    def _normalize_explicit_obj(
+        self,
+        *,
+        field: str,
+        obj: dict[str, Any],
+        scene_id: str,
+        timestamp: int,
+        scene_memory_count: int = 1,
+    ) -> dict[str, Any]:
+        value = str(obj.get("value", "")).strip()
+        if not value:
+            return {}
+        ts = int(obj.get("timestamp") or timestamp)
+        confidence = float(obj.get("confidence", 0.72))
+        confidence = max(0.0, min(1.0, confidence))
+        source = str(obj.get("source") or "scene_summary").strip() or "scene_summary"
+        scene_count = max(1, int(scene_memory_count))
+        base_score = float(obj.get("decay_score", confidence))
+        scene_boost = min(0.22, 0.04 * float(max(0, scene_count - 1)))
+        support_base = max(1, int(obj.get("support_count", 1)))
+        support_with_scene = support_base + min(3, max(0, scene_count - 1))
+        return {
+            "value": value,
+            "timestamp": ts,
+            "scene_id": scene_id,
+            "scene_memory_count": scene_count,
+            "source": source,
+            "confidence": confidence,
+            "decay_score": max(0.0, min(1.2, base_score + scene_boost)),
+            "support_count": support_with_scene,
+        }
+
+    def _merge_same_value(
+        self,
+        *,
+        old_obj: dict[str, Any],
+        new_obj: dict[str, Any],
+        scene_id: str,
+        timestamp: int,
+    ) -> dict[str, Any]:
+        merged = dict(old_obj)
+        merged["timestamp"] = max(
+            int(old_obj.get("timestamp") or 0), int(new_obj.get("timestamp") or timestamp)
+        )
+        merged["scene_id"] = scene_id
+        merged["source"] = str(new_obj.get("source") or old_obj.get("source") or "scene_summary")
+        merged["confidence"] = max(
+            float(old_obj.get("confidence", 0.6)),
+            float(new_obj.get("confidence", 0.6)),
+        )
+        merged["support_count"] = max(1, int(old_obj.get("support_count", 1))) + 1
+        boosted = float(new_obj.get("decay_score", merged.get("confidence", 0.6)))
+        merged["decay_score"] = max(float(old_obj.get("decay_score", 0.6)), boosted)
+        return merged
+
+    def _pick_conflict_winner(
+        self, *, old_obj: dict[str, Any], new_obj: dict[str, Any], now_ts: int
+    ) -> str:
+        old_score = self._decayed_score(old_obj, now_ts=now_ts)
+        new_score = self._decayed_score(new_obj, now_ts=now_ts)
+        if new_score >= old_score + self.profile_conflict_switch_margin:
+            return "new"
+        if int(new_obj.get("timestamp") or 0) > int(old_obj.get("timestamp") or 0):
+            # Recency acts as tie-breaker when scores are close.
+            if new_score + 0.03 >= old_score:
+                return "new"
+        return "old"
+
+    def _decayed_score(self, obj: dict[str, Any], *, now_ts: int) -> float:
+        base = float(obj.get("decay_score", obj.get("confidence", 0.6)))
+        ts = int(obj.get("timestamp") or now_ts)
+        age_sec = max(0, int(now_ts) - ts)
+        half_life_sec = float(self.profile_decay_half_life_days) * 86400.0
+        decay = math.pow(0.5, float(age_sec) / max(1.0, half_life_sec))
+        support = max(1, int(obj.get("support_count", 1)))
+        support_bonus = 1.0 + min(0.35, float(support - 1) * 0.06)
+        return max(0.0, base * decay * support_bonus)
 
     @staticmethod
     def _merge_scene_summary(old: str, new: str) -> str:

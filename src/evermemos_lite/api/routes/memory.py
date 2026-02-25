@@ -68,6 +68,34 @@ class SearchRequest(BaseModel):
     request_override: dict[str, Any] | None = None
 
 
+def _build_retrieve_method_patch(retrieve_method: RetrieveMethod) -> RuntimePolicy:
+    if retrieve_method == "keyword":
+        return RuntimePolicy(
+            vector_enabled=False,
+            keyword_enabled=True,
+            agentic_enabled=False,
+        )
+    if retrieve_method == "vector":
+        return RuntimePolicy(
+            vector_enabled=True,
+            keyword_enabled=False,
+            agentic_enabled=False,
+        )
+    if retrieve_method in ("hybrid", "rrf"):
+        return RuntimePolicy(
+            vector_enabled=True,
+            keyword_enabled=True,
+            agentic_enabled=False,
+        )
+    if retrieve_method == "agentic":
+        return RuntimePolicy(
+            vector_enabled=True,
+            keyword_enabled=True,
+            agentic_enabled=True,
+        )
+    return RuntimePolicy()
+
+
 def _to_unix(value: str | int) -> int:
     if isinstance(value, int):
         ts = value
@@ -97,6 +125,31 @@ def _slice_content(content: str, max_len: int = 240, max_parts: int = 12) -> lis
         if len(out) >= max_parts:
             return out[:max_parts]
     return out[:max_parts]
+
+
+def _validate_time_filters(
+    *,
+    as_of_time: int | None,
+    start_time: int | None,
+    end_time: int | None,
+) -> tuple[int | None, int | None, int | None]:
+    as_of = int(as_of_time) if as_of_time is not None else None
+    start = int(start_time) if start_time is not None else None
+    end = int(end_time) if end_time is not None else None
+    if as_of is not None and as_of <= 0:
+        raise HTTPException(status_code=400, detail="as_of_time out of range")
+    if start is not None and start <= 0:
+        raise HTTPException(status_code=400, detail="start_time out of range")
+    if end is not None and end <= 0:
+        raise HTTPException(status_code=400, detail="end_time out of range")
+    if as_of is not None and (start is not None or end is not None):
+        raise HTTPException(
+            status_code=400,
+            detail="as_of_time cannot be combined with start_time/end_time",
+        )
+    if start is not None and end is not None and start > end:
+        raise HTTPException(status_code=400, detail="start_time cannot be greater than end_time")
+    return as_of, start, end
 
 
 @router.post("")
@@ -147,13 +200,11 @@ async def memorize(payload: MemorizeRequest, request: Request) -> dict[str, Any]
     except RuntimeError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
+    vector_index_result: dict[str, Any] = {"status": "skipped", "reason": "not_attempted"}
     if policy.vector_enabled and result.get("memory"):
-        try:
-            await anyio.to_thread.run_sync(
-                memory_service.maybe_index_vector, policy, result["memory"]
-            )
-        except Exception:
-            pass
+        vector_index_result = await anyio.to_thread.run_sync(
+            memory_service.maybe_index_vector, policy, result["memory"]
+        )
 
     elapsed_ms = int((time.perf_counter() - start_perf) * 1000)
     await anyio.to_thread.run_sync(
@@ -191,6 +242,7 @@ async def memorize(payload: MemorizeRequest, request: Request) -> dict[str, Any]
             "storage_tier": str(result.get("storage_tier") or memory.get("storage_tier") or "text_only"),
             "scene_id": memory.get("scene_id") or result.get("scene_id"),
             "content_slices": content_slices,
+            "vector_index": vector_index_result,
             "memory": memory,
         },
         "request_id": request_id,
@@ -203,11 +255,29 @@ async def fetch_memories(
     user_id: str | None = None,
     group_id: str | None = None,
     limit: int = 40,
+    as_of_time: int | None = None,
+    start_time: int | None = None,
+    end_time: int | None = None,
 ) -> dict[str, Any]:
     if limit < 1 or limit > 200:
         raise HTTPException(status_code=400, detail="limit out of range")
+    as_of_ts, start_ts, end_ts = _validate_time_filters(
+        as_of_time=as_of_time,
+        start_time=start_time,
+        end_time=end_time,
+    )
     memory_service = request.app.state.memory_service
-    episodes = await anyio.to_thread.run_sync(memory_service.fetch, user_id, group_id, limit)
+    episodes = await anyio.to_thread.run_sync(
+        partial(
+            memory_service.fetch,
+            user_id=user_id,
+            group_id=group_id,
+            limit=limit,
+            as_of_ts=as_of_ts,
+            start_ts=start_ts,
+            end_ts=end_ts,
+        )
+    )
     conflicts = await anyio.to_thread.run_sync(
         partial(
             memory_service.repo.list_recent_conflicts,
@@ -242,12 +312,20 @@ async def search_memories(
     decision_mode: DecisionMode = "static",
     runtime_profile: str | None = None,
     top_k: int = 20,
+    as_of_time: int | None = None,
+    start_time: int | None = None,
+    end_time: int | None = None,
 ) -> dict[str, Any]:
     query = query.strip()
     if not query:
         raise HTTPException(status_code=400, detail="query must not be blank")
     if top_k < 1 or top_k > 100:
         raise HTTPException(status_code=400, detail="top_k out of range")
+    as_of_ts, start_ts, end_ts = _validate_time_filters(
+        as_of_time=as_of_time,
+        start_time=start_time,
+        end_time=end_time,
+    )
 
     settings = request.app.state.settings
     resolver = request.app.state.policy_resolver
@@ -255,15 +333,7 @@ async def search_memories(
     rule_selector = request.app.state.rule_retrieval_mode_selector
     agent_selector = request.app.state.agent_retrieval_mode_selector
 
-    patch = RuntimePolicy()
-    if retrieve_method == "keyword":
-        patch = RuntimePolicy(vector_enabled=False, keyword_enabled=True)
-    elif retrieve_method == "vector":
-        patch = RuntimePolicy(vector_enabled=True, keyword_enabled=False)
-    elif retrieve_method in ("hybrid", "rrf"):
-        patch = RuntimePolicy(vector_enabled=True, keyword_enabled=True)
-    elif retrieve_method == "agentic":
-        patch = RuntimePolicy(vector_enabled=True, keyword_enabled=True, agentic_enabled=True)
+    patch = _build_retrieve_method_patch(retrieve_method)
 
     if runtime_profile:
         if runtime_profile not in PROFILE_PRESETS:
@@ -296,6 +366,9 @@ async def search_memories(
             user_id=user_id,
             group_id=group_id,
             top_k=top_k,
+            as_of_ts=as_of_ts,
+            start_ts=start_ts,
+            end_ts=end_ts,
         )
     )
     conflicts = await anyio.to_thread.run_sync(
