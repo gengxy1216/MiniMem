@@ -182,9 +182,19 @@ class MemoryService:
             facts=list(extracted.atomic_facts) or [extracted.episode],
             user_id=payload.sender,
         )
+        has_entity_relation = bool(triples)
         storage_tier = self._decide_storage_tier(
             importance=float(extracted_importance),
-            has_entity_relation=bool(triples),
+            has_entity_relation=has_entity_relation,
+        )
+        memory_category = self._decide_memory_category(
+            episode=extracted.episode,
+            summary=extracted.summary,
+            subject=extracted.subject,
+            atomic_facts=list(extracted.atomic_facts),
+            profile_patch=extracted.profile_patch,
+            foresights=list(extracted.foresights),
+            has_entity_relation=has_entity_relation,
         )
         episode = self.repo.save_message_as_memory(
             message_id=payload.message_id,
@@ -203,6 +213,7 @@ class MemoryService:
             atomic_facts=extracted.atomic_facts,
             foresights=extracted.foresights,
             profile_patch=extracted.profile_patch,
+            memory_category=memory_category,
             event_id=request_id,
         )
 
@@ -240,6 +251,7 @@ class MemoryService:
             "subject": extracted.subject,
             "importance_score": extracted_importance,
             "storage_tier": storage_tier,
+            "memory_category": memory_category,
             "scene_id": episode.get("scene_id"),
         }
 
@@ -1579,6 +1591,37 @@ class MemoryService:
         return "text_only"
 
     @staticmethod
+    def _decide_memory_category(
+        *,
+        episode: str,
+        summary: str,
+        subject: str,
+        atomic_facts: list[str],
+        profile_patch: dict[str, Any],
+        foresights: list[dict[str, Any]],
+        has_entity_relation: bool,
+    ) -> str:
+        if isinstance(profile_patch, dict) and any(str(k).strip() for k in profile_patch.keys()):
+            return "profile"
+        if any(str(item.get("content", "")).strip() for item in foresights if isinstance(item, dict)):
+            return "plan"
+        text = " ".join(
+            [
+                str(episode or ""),
+                str(summary or ""),
+                str(subject or ""),
+                " ".join(str(x) for x in atomic_facts),
+            ]
+        ).lower()
+        if re.search(r"(待办|任务|todo|deadline|截止|提醒|完成|进度)", text):
+            return "task"
+        if has_entity_relation or len([x for x in atomic_facts if str(x).strip()]) >= 2:
+            return "knowledge"
+        if re.search(r"(今天|昨天|上周|明天|会议|旅行|发生|event)", text):
+            return "event"
+        return "general"
+
+    @staticmethod
     def _format_turn_markdown(
         *, user_text: str, assistant_text: str, timestamp: int
     ) -> str:
@@ -1822,6 +1865,7 @@ class MemoryService:
                     "source": "graph_kuzu",
                     "confidence": confidence,
                     "storage_tier": "graph_text",
+                    "memory_category": "knowledge",
                 }
             )
         merged.sort(key=lambda x: float(x.get("score", 0.0)), reverse=True)
@@ -1901,6 +1945,7 @@ class MemoryService:
                     "episode": f"用户{field}为{value}",
                     "importance_score": 0.95 if field == "name" else 0.82,
                     "storage_tier": "text_only",
+                    "memory_category": "profile",
                     "score": 0.72 + overlap,
                     "source": "profile_snapshot",
                 }

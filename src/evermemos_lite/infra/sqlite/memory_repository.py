@@ -9,6 +9,8 @@ from typing import Any
 
 from evermemos_lite.infra.sqlite.db import SQLiteEngine
 
+_CATEGORY_SET = {"general", "profile", "plan", "task", "event", "knowledge"}
+
 
 class MemoryRepository:
     def __init__(self, engine: SQLiteEngine) -> None:
@@ -33,18 +35,21 @@ class MemoryRepository:
         atomic_facts: list[str],
         foresights: list[dict[str, Any]],
         profile_patch: dict[str, Any],
+        memory_category: str = "general",
         event_id: str | None = None,
     ) -> dict[str, Any]:
         eid = event_id or uuid.uuid4().hex
         mid = uuid.uuid4().hex
         now = int(time.time())
+        category = self._normalize_category(memory_category)
+        tier = self._normalize_token_tag(storage_tier, fallback="text_only")
 
         self.engine.execute(
             """
             INSERT INTO episodic_memory(
                 id,event_id,source_message_id,user_id,group_id,timestamp,role,sender,sender_name,
-                group_name,episode,summary,subject,importance_score,scene_id,storage_tier,created_at,updated_at
-            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                group_name,episode,summary,subject,importance_score,scene_id,storage_tier,memory_category,created_at,updated_at
+            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             """,
             (
                 mid,
@@ -62,7 +67,8 @@ class MemoryRepository:
                 subject,
                 float(importance_score),
                 None,
-                str(storage_tier or "text_only"),
+                tier,
+                category,
                 now,
                 now,
             ),
@@ -97,6 +103,8 @@ class MemoryRepository:
             summary=summary,
             subject=subject,
             atomic_facts=atomic_facts,
+            memory_category=category,
+            storage_tier=tier,
         )
         if profile_patch:
             self.upsert_profile_snapshot(
@@ -118,7 +126,8 @@ class MemoryRepository:
             "subject": subject,
             "importance_score": float(importance_score),
             "scene_id": None,
-            "storage_tier": str(storage_tier or "text_only"),
+            "storage_tier": tier,
+            "memory_category": category,
         }
 
     def fetch_episodes(
@@ -142,6 +151,7 @@ class MemoryRepository:
               m.importance_score,
               m.scene_id,
               m.storage_tier,
+              m.memory_category,
               COALESCE(f.fact_text,'') AS atomic_fact_text
             FROM episodic_memory m
             LEFT JOIN (
@@ -186,7 +196,8 @@ class MemoryRepository:
               m.subject,
               m.importance_score,
               m.scene_id,
-              m.storage_tier
+              m.storage_tier,
+              m.memory_category
             FROM episodic_memory m
             WHERE m.is_deleted=0
               AND m.id IN ({placeholders})
@@ -241,6 +252,7 @@ class MemoryRepository:
         terms = self._tokenize_text(query)
         if not terms:
             terms = [query.lower()]
+        hinted_categories = set(self._infer_query_categories(query))
         scored: list[dict[str, Any]] = []
         for row in rows:
             raw_text = " ".join(
@@ -249,6 +261,8 @@ class MemoryRepository:
                     str(row.get("summary", "")),
                     str(row.get("subject", "")),
                     str(row.get("atomic_fact_text", "")),
+                    f"cat_{self._normalize_category(str(row.get('memory_category') or 'general'))}",
+                    f"tier_{self._normalize_token_tag(str(row.get('storage_tier') or 'text_only'), fallback='text_only')}",
                 ]
             ).lower()
             text_tokens = self._tokenize_text(raw_text)
@@ -259,6 +273,9 @@ class MemoryRepository:
                 score += float(raw_text.count(term))
             if score <= 0 and query.lower() not in raw_text:
                 continue
+            memory_category = self._normalize_category(str(row.get("memory_category") or "general"))
+            if hinted_categories and memory_category in hinted_categories:
+                score += 1.8
             if score <= 0:
                 score = 1.0
             scored.append(
@@ -287,6 +304,10 @@ class MemoryRepository:
         dedup_terms = list(dict.fromkeys(t for t in terms if t.strip()))
         if not dedup_terms:
             return []
+        hinted_categories = self._infer_query_categories(query)
+        for cat in hinted_categories:
+            dedup_terms.append(f"cat_{cat}")
+        dedup_terms = list(dict.fromkeys(dedup_terms))
         # Keep query plan bounded on device-side workloads.
         selected = dedup_terms[:24]
         match_query = " OR ".join(
@@ -328,6 +349,9 @@ class MemoryRepository:
             lexical = 0.0
             for term in dedup_terms:
                 lexical += float(raw_text.count(term))
+            for cat in hinted_categories:
+                if f"cat_{cat}" in raw_text:
+                    lexical += 2.2
             bm25_raw = row.get("bm25_score")
             try:
                 bm25_val = float(bm25_raw if bm25_raw is not None else 0.0)
@@ -366,6 +390,51 @@ class MemoryRepository:
     @staticmethod
     def _escape_fts_term(term: str) -> str:
         return str(term or "").replace('"', '""')
+
+    @staticmethod
+    def _normalize_category(category: str, *, fallback: str = "general") -> str:
+        name = re.sub(r"[^a-z0-9_]+", "_", str(category or "").strip().lower()).strip("_")
+        if not name:
+            name = fallback
+        return name if name in _CATEGORY_SET else fallback
+
+    @staticmethod
+    def _normalize_token_tag(value: str, *, fallback: str) -> str:
+        name = re.sub(r"[^a-z0-9_]+", "_", str(value or "").strip().lower()).strip("_")
+        return name or fallback
+
+    @staticmethod
+    def _infer_query_categories(query: str) -> list[str]:
+        text = str(query or "").strip().lower()
+        if not text:
+            return []
+        mapping = (
+            (
+                "profile",
+                ("我是谁", "我的名字", "叫什", "name", "生日", "联系方式", "住址", "profile"),
+            ),
+            (
+                "task",
+                ("待办", "任务", "todo", "deadline", "截止", "提醒", "完成", "进度"),
+            ),
+            (
+                "plan",
+                ("计划", "打算", "明天", "下周", "下个月", "行程", "安排", "future", "next"),
+            ),
+            (
+                "event",
+                ("发生", "什么时候", "昨天", "今天", "上周", "去年", "会议", "旅行", "event"),
+            ),
+            (
+                "knowledge",
+                ("是什么", "为什么", "关系", "定义", "知识", "项目", "ticket", "issue", "how", "what"),
+            ),
+        )
+        matched: list[str] = []
+        for category, terms in mapping:
+            if any(term in text for term in terms):
+                matched.append(category)
+        return matched
 
     def get_latest_profile_snapshot(
         self, user_id: str | None, group_id: str | None
@@ -768,13 +837,19 @@ class MemoryRepository:
         summary: str,
         subject: str,
         atomic_facts: list[str],
+        memory_category: str,
+        storage_tier: str,
     ) -> None:
+        category = self._normalize_category(memory_category)
+        tier = self._normalize_token_tag(storage_tier, fallback="text_only")
         search_text = " ".join(
             [
                 str(episode or "").strip(),
                 str(summary or "").strip(),
                 str(subject or "").strip(),
                 " ".join(str(x).strip() for x in atomic_facts if str(x).strip()),
+                f"cat_{category}",
+                f"tier_{tier}",
             ]
         ).strip()
         if not search_text:

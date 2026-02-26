@@ -11,3 +11,9 @@ async def get_request_status(request: Request, request_id: str) -> dict:
     if row is None:
         return {"status": "ok", "result": {"request_id": request_id, "state": "not_found"}}
     return {"status": "ok", "result": row}
+
+
+@router.get("/vector-index/summary")
+async def get_vector_index_summary(request: Request) -> dict:
+    memory_service = request.app.state.memory_service
+    return {"status": "ok", "result": memory_service.get_vector_index_stats()}

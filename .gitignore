@@ -20,6 +20,7 @@ docs/RELEASING.md
 everMemOs.pdf
 tmp_paper.txt
 
-# Local test workspace (exclude from open-source publish)
-tests/
+dist/
+tools/perf/results/
+
 

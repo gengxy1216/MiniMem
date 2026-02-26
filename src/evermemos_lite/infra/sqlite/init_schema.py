@@ -25,6 +25,7 @@ def init_schema(engine: SQLiteEngine) -> None:
             importance_score REAL NOT NULL DEFAULT 0,
             scene_id TEXT,
             storage_tier TEXT NOT NULL DEFAULT 'text_only',
+            memory_category TEXT NOT NULL DEFAULT 'general',
             is_deleted INTEGER NOT NULL DEFAULT 0,
             created_at INTEGER NOT NULL,
             updated_at INTEGER NOT NULL
@@ -98,22 +99,6 @@ def init_schema(engine: SQLiteEngine) -> None:
         )
         """,
         """
-        CREATE TABLE IF NOT EXISTS memory_vector (
-            id TEXT PRIMARY KEY,
-            memory_type TEXT NOT NULL,
-            memory_id TEXT NOT NULL,
-            user_id TEXT NOT NULL,
-            group_id TEXT,
-            timestamp INTEGER NOT NULL,
-            importance_score REAL NOT NULL,
-            vector_dim INTEGER NOT NULL,
-            vector_dtype TEXT NOT NULL,
-            model_name TEXT NOT NULL,
-            created_at INTEGER NOT NULL,
-            updated_at INTEGER NOT NULL
-        )
-        """,
-        """
         CREATE TABLE IF NOT EXISTS memscene (
             id TEXT PRIMARY KEY,
             user_id TEXT NOT NULL,
@@ -164,6 +149,7 @@ def init_schema(engine: SQLiteEngine) -> None:
     ]
     for sql in ddl:
         engine.execute(sql)
+    _ensure_keyword_index(engine)
     _ensure_column(
         engine,
         table="episodic_memory",
@@ -176,14 +162,24 @@ def init_schema(engine: SQLiteEngine) -> None:
         column="storage_tier",
         ddl="ALTER TABLE episodic_memory ADD COLUMN storage_tier TEXT NOT NULL DEFAULT 'text_only'",
     )
+    _ensure_column(
+        engine,
+        table="episodic_memory",
+        column="memory_category",
+        ddl="ALTER TABLE episodic_memory ADD COLUMN memory_category TEXT NOT NULL DEFAULT 'general'",
+    )
     now = int(time.time())
     engine.execute(
         "UPDATE episodic_memory SET storage_tier='text_only' WHERE storage_tier IS NULL OR storage_tier=''"
     )
     engine.execute(
+        "UPDATE episodic_memory SET memory_category='general' WHERE memory_category IS NULL OR memory_category=''"
+    )
+    engine.execute(
         "UPDATE episodic_memory SET updated_at=? WHERE updated_at IS NULL",
         (now,),
     )
+    _rebuild_keyword_index_if_needed(engine)
 
 
 def _ensure_column(engine: SQLiteEngine, *, table: str, column: str, ddl: str) -> None:
@@ -192,3 +188,65 @@ def _ensure_column(engine: SQLiteEngine, *, table: str, column: str, ddl: str) -
     if column in cols:
         return
     engine.execute(ddl)
+
+
+def _ensure_keyword_index(engine: SQLiteEngine) -> None:
+    try:
+        engine.execute(
+            """
+            CREATE VIRTUAL TABLE IF NOT EXISTS memory_keyword_fts
+            USING fts5(
+                memory_id UNINDEXED,
+                user_id UNINDEXED,
+                group_id UNINDEXED,
+                search_text,
+                tokenize='unicode61'
+            )
+            """
+        )
+    except Exception:
+        # Keep startup resilient on SQLite builds without FTS5.
+        return
+
+
+def _rebuild_keyword_index_if_needed(engine: SQLiteEngine) -> None:
+    try:
+        engine.execute(
+            """
+            DELETE FROM memory_keyword_fts
+            WHERE memory_id IN (
+                SELECT id FROM episodic_memory WHERE is_deleted=1
+            )
+            """
+        )
+        engine.execute(
+            """
+            INSERT INTO memory_keyword_fts(memory_id,user_id,group_id,search_text)
+            SELECT
+              m.id,
+              m.user_id,
+              COALESCE(m.group_id,''),
+              trim(
+                COALESCE(m.episode,'') || ' ' ||
+                COALESCE(m.summary,'') || ' ' ||
+                COALESCE(m.subject,'') || ' ' ||
+                COALESCE(f.fact_text,'') || ' ' ||
+                'cat_' || REPLACE(COALESCE(NULLIF(m.memory_category,''),'general'), ' ', '_') || ' ' ||
+                'tier_' || REPLACE(COALESCE(NULLIF(m.storage_tier,''),'text_only'), ' ', '_')
+              )
+            FROM episodic_memory m
+            LEFT JOIN (
+              SELECT memory_id, group_concat(fact, ' ') AS fact_text
+              FROM memory_fact
+              GROUP BY memory_id
+            ) f ON f.memory_id = m.id
+            WHERE m.is_deleted=0
+              AND NOT EXISTS (
+                SELECT 1
+                FROM memory_keyword_fts idx
+                WHERE idx.memory_id = m.id
+              )
+            """
+        )
+    except Exception:
+        return

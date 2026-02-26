@@ -32,35 +32,35 @@ class RetrievalProfile:
 
 
 PROFILE_PRESETS: dict[str, RetrievalProfile] = {
-    "low": RetrievalProfile(
-        name="low",
+    "keyword": RetrievalProfile(
+        name="keyword",
         vector_dim=256,
-        vector_enabled=True,
+        vector_enabled=False,
         keyword_enabled=True,
         agentic_enabled=False,
-        importance_threshold=0.35,
-        keyword_top_k=20,
-        vector_top_k=20,
+        importance_threshold=0.45,
+        keyword_top_k=24,
+        vector_top_k=0,
         rrf_k=60,
     ),
-    "medium": RetrievalProfile(
-        name="medium",
+    "hybrid": RetrievalProfile(
+        name="hybrid",
         vector_dim=384,
         vector_enabled=True,
         keyword_enabled=True,
-        agentic_enabled=True,
+        agentic_enabled=False,
         importance_threshold=0.25,
         keyword_top_k=30,
         vector_top_k=30,
         rrf_k=60,
     ),
-    "high": RetrievalProfile(
-        name="high",
+    "agentic": RetrievalProfile(
+        name="agentic",
         vector_dim=768,
         vector_enabled=True,
         keyword_enabled=True,
         agentic_enabled=True,
-        importance_threshold=0.1,
+        importance_threshold=0.15,
         keyword_top_k=50,
         vector_top_k=50,
         rrf_k=80,

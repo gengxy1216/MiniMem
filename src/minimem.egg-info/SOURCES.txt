@@ -14,7 +14,6 @@ src/evermemos_lite/api/routes/policy.py
 src/evermemos_lite/api/routes/status.py
 src/evermemos_lite/api/routes/ui.py
 src/evermemos_lite/bootstrap/app_factory.py
-src/evermemos_lite/bootstrap/runtime_updates.py
 src/evermemos_lite/config/profiles.py
 src/evermemos_lite/config/settings.py
 src/evermemos_lite/domain/policy.py
@@ -31,7 +30,6 @@ src/evermemos_lite/infra/sqlite/memory_repository.py
 src/evermemos_lite/infra/sqlite/request_status_repository.py
 src/evermemos_lite/infra/vector/lancedb_store.py
 src/evermemos_lite/service/chat_responder.py
-src/evermemos_lite/service/embedding.py
 src/evermemos_lite/service/extractor.py
 src/evermemos_lite/service/extractor_factory.py
 src/evermemos_lite/service/graph_extractor.py

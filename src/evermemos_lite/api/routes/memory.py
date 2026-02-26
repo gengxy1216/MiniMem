@@ -240,6 +240,9 @@ async def memorize(payload: MemorizeRequest, request: Request) -> dict[str, Any]
             "subject": str(result.get("subject", "")),
             "importance_score": float(result.get("importance_score", 0.0)),
             "storage_tier": str(result.get("storage_tier") or memory.get("storage_tier") or "text_only"),
+            "memory_category": str(
+                result.get("memory_category") or memory.get("memory_category") or "general"
+            ),
             "scene_id": memory.get("scene_id") or result.get("scene_id"),
             "content_slices": content_slices,
             "vector_index": vector_index_result,

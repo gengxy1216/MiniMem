@@ -1483,9 +1483,13 @@
       }
       const maxItems=8;
       const items=rows.slice(0,maxItems).map((c,idx)=>{
-        const summary=shortText(c?.summary||c?.episode||"-",220);
+        const summary=shortText(c?.citation_snippet||c?.summary||c?.episode||"-",220);
         const source=String(c?.source||"-");
         const tier=String(c?.storage_tier||"-");
+        const sliceNo=Number(c?.citation_slice);
+        const sliceText=Number.isFinite(sliceNo)&&sliceNo>0?`slice ${sliceNo}`:"";
+        const matchScore=Number(c?.citation_match_score);
+        const matchText=Number.isFinite(matchScore)?`match ${matchScore.toFixed(3)}`:"";
         const score=Number(c?.score);
         const imp=Number(c?.importance_score);
         const scoreText=Number.isFinite(score)?`score ${score.toFixed(3)}`:"";
@@ -1497,8 +1501,10 @@
           "<div class='citation-item-meta'>"+
           `<span>${safe(source)}</span>`+
           `<span>${safe(tier)}</span>`+
+          `${sliceText?`<span>${safe(sliceText)}</span>`:""}`+
           `${scoreText?`<span>${safe(scoreText)}</span>`:""}`+
           `${impText?`<span>${safe(impText)}</span>`:""}`+
+          `${matchText?`<span>${safe(matchText)}</span>`:""}`+
           `<span>${safe(timeText)}</span>`+
           "</div>"+
           "</article>"

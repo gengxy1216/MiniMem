@@ -1,9 +1,79 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime
 from urllib import error, request
 from typing import Any
+
+_TOKEN_RE = re.compile(r"[a-z0-9_]+|[\u4e00-\u9fff]{1,4}")
+_STOP_TOKENS = {"我", "你", "他", "她", "它", "吗", "呢", "啊", "呀", "的", "了"}
+_SLICE_LEN = 240
+_SNIPPET_LEN = 220
+
+
+def _normalize_text(value: Any) -> str:
+    text = str(value or "")
+    text = text.replace("\r\n", "\n")
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
+
+
+def _tokenize_text(value: str) -> set[str]:
+    raw = _normalize_text(value).lower()
+    if not raw:
+        return set()
+    tokens = {t for t in _TOKEN_RE.findall(raw) if t}
+    chars = re.findall(r"[\u4e00-\u9fff]", raw)
+    for idx in range(len(chars) - 1):
+        tokens.add(chars[idx] + chars[idx + 1])
+    if chars:
+        tokens.add("".join(chars))
+    return {t for t in tokens if t and t not in _STOP_TOKENS}
+
+
+def _token_overlap(a: set[str], b: set[str]) -> float:
+    if not a or not b:
+        return 0.0
+    return float(len(a & b)) / float(max(1, len(a | b)))
+
+
+def _slice_text(value: str, slice_len: int) -> list[str]:
+    text = _normalize_text(value)
+    if not text:
+        return []
+    out: list[str] = []
+    for idx in range(0, len(text), max(1, int(slice_len))):
+        out.append(text[idx : idx + slice_len])
+    return out
+
+
+def _extract_query_snippet(query: str, text: str) -> tuple[str, int | None, float]:
+    clean = _normalize_text(text)
+    if not clean:
+        return "", None, 0.0
+    q = _normalize_text(query)
+    if q:
+        hit_idx = clean.lower().find(q.lower())
+        if hit_idx >= 0:
+            slice_no = hit_idx // _SLICE_LEN + 1
+            start = max(0, hit_idx - 40)
+            snippet = clean[start : start + _SNIPPET_LEN]
+            return snippet, slice_no, 1.0
+    chunks = _slice_text(clean, _SLICE_LEN)
+    if not chunks:
+        return clean[:_SNIPPET_LEN], 1, 0.0
+    query_tokens = _tokenize_text(q)
+    if not query_tokens:
+        return chunks[0][:_SNIPPET_LEN], 1, 0.0
+    best_idx = 0
+    best_score = -1.0
+    for idx, chunk in enumerate(chunks):
+        score = _token_overlap(query_tokens, _tokenize_text(chunk))
+        if score > best_score:
+            best_idx = idx
+            best_score = score
+    return chunks[best_idx][:_SNIPPET_LEN], best_idx + 1, max(0.0, best_score)
 
 
 class ChatResponder:
@@ -44,10 +114,21 @@ class ChatResponder:
             raise ValueError(f"chat provider '{active_provider}' missing model")
 
         snippets: list[str] = []
+        citations: list[dict[str, Any]] = []
         for row in memories[:5]:
-            summary = str(row.get("summary") or row.get("episode") or "").strip()
-            if summary:
-                snippets.append(f"- {summary}")
+            base_text = str(row.get("episode") or row.get("summary") or "")
+            fallback_text = str(row.get("summary") or row.get("episode") or "").strip()
+            snippet, slice_no, match_score = _extract_query_snippet(query, base_text)
+            if not snippet:
+                snippet = fallback_text
+            if snippet:
+                snippets.append(f"- {snippet}")
+            citation = dict(row)
+            citation["citation_snippet"] = snippet
+            citation["citation_match_score"] = float(match_score)
+            if slice_no is not None:
+                citation["citation_slice"] = int(slice_no)
+            citations.append(citation)
         memory_context = "\n".join(snippets) if snippets else "- 当前没有检索到可用记忆。"
         now = system_time or datetime.now().astimezone()
         system_prompt = (
@@ -74,7 +155,7 @@ class ChatResponder:
         )
         return {
             "answer": answer,
-            "citations": memories[:5],
+            "citations": citations,
             "model": active_model,
             "provider": active_provider,
         }

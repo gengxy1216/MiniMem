@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from pathlib import Path
 import re
+from threading import Lock
 from typing import Any
 
 
@@ -51,8 +53,11 @@ class KuzuGraphStore:
         self.db_dir = Path(db_dir)
         self.db_path = _resolve_kuzu_db_path(self.db_dir)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        self._rows_path = self.db_path.parent / "graph_rows.jsonl"
         self.enabled = bool(enabled)
+        self._lock = Lock()
         self._rows: list[GraphRow] = []
+        self._load_rows()
 
     def upsert_triples(
         self,
@@ -66,28 +71,25 @@ class KuzuGraphStore:
         if not self.enabled:
             return 0
         inserted = 0
+        append_rows: list[GraphRow] = []
         for t in triples:
-            subject = str(getattr(t, "subject", "")).strip()
-            relation = str(getattr(t, "relation", "")).strip()
-            obj = str(getattr(t, "obj", "")).strip()
-            confidence = float(getattr(t, "confidence", 0.5))
-            if not subject or not relation or not obj:
-                continue
-            if _is_noise_triple(subject, relation, obj):
-                continue
-            self._rows.append(
-                GraphRow(
-                    subject=subject,
-                    relation=relation,
-                    obj=obj,
-                    confidence=max(0.0, min(1.0, confidence)),
-                    event_id=event_id,
-                    timestamp=int(timestamp),
-                    user_id=user_id,
-                    group_id=group_id,
-                )
+            row = self._to_graph_row(
+                triple=t,
+                event_id=event_id,
+                timestamp=timestamp,
+                user_id=user_id,
+                group_id=group_id,
             )
-            inserted += 1
+            if row is None:
+                continue
+            append_rows.append(row)
+        if not append_rows:
+            return 0
+        with self._lock:
+            self._rows.extend(append_rows)
+            for row in append_rows:
+                self._append_row(row)
+                inserted += 1
         return inserted
 
     def search(
@@ -97,8 +99,10 @@ class KuzuGraphStore:
             return []
         q = query.strip().lower()
         q_tokens = _tokenize_text(q)
+        with self._lock:
+            rows_snapshot = list(self._rows)
         out: list[tuple[float, dict[str, Any]]] = []
-        for row in reversed(self._rows):
+        for row in reversed(rows_snapshot):
             if user_id and row.user_id != user_id:
                 continue
             if group_id and row.group_id != group_id:
@@ -124,8 +128,10 @@ class KuzuGraphStore:
         if not self.enabled:
             return []
         name = entity_name.strip().lower()
+        with self._lock:
+            rows_snapshot = list(self._rows)
         out: list[dict[str, Any]] = []
-        for row in reversed(self._rows):
+        for row in reversed(rows_snapshot):
             if user_id and row.user_id != user_id:
                 continue
             if group_id and row.group_id != group_id:
@@ -136,6 +142,92 @@ class KuzuGraphStore:
             if len(out) >= max(1, int(limit)):
                 break
         return out
+
+    def _to_graph_row(
+        self,
+        *,
+        triple: Any,
+        event_id: str,
+        timestamp: int,
+        user_id: str | None,
+        group_id: str | None,
+    ) -> GraphRow | None:
+        subject = str(getattr(triple, "subject", "")).strip()
+        relation = str(getattr(triple, "relation", "")).strip()
+        obj = str(getattr(triple, "obj", "")).strip()
+        confidence = float(getattr(triple, "confidence", 0.5))
+        if not subject or not relation or not obj:
+            return None
+        if _is_noise_triple(subject, relation, obj):
+            return None
+        return GraphRow(
+            subject=subject,
+            relation=relation,
+            obj=obj,
+            confidence=max(0.0, min(1.0, confidence)),
+            event_id=event_id,
+            timestamp=int(timestamp),
+            user_id=user_id,
+            group_id=group_id,
+        )
+
+    def _append_row(self, row: GraphRow) -> None:
+        self._rows_path.parent.mkdir(parents=True, exist_ok=True)
+        with self._rows_path.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(row.to_dict(), ensure_ascii=False))
+            fh.write("\n")
+
+    def _load_rows(self) -> None:
+        if not self._rows_path.exists():
+            return
+        restored: list[GraphRow] = []
+        with self._rows_path.open("r", encoding="utf-8") as fh:
+            for line in fh:
+                text = line.strip()
+                if not text:
+                    continue
+                try:
+                    payload = json.loads(text)
+                except Exception:
+                    continue
+                row = self._row_from_dict(payload)
+                if row is None:
+                    continue
+                restored.append(row)
+        self._rows = restored
+
+    @staticmethod
+    def _row_from_dict(value: Any) -> GraphRow | None:
+        if not isinstance(value, dict):
+            return None
+        subject = str(value.get("subject", "")).strip()
+        relation = str(value.get("relation", "")).strip()
+        obj = str(value.get("obj", "")).strip()
+        event_id = str(value.get("event_id", "")).strip()
+        if not subject or not relation or not obj or not event_id:
+            return None
+        try:
+            confidence = float(value.get("confidence", 0.5))
+        except Exception:
+            confidence = 0.5
+        try:
+            timestamp = int(value.get("timestamp", 0))
+        except Exception:
+            timestamp = 0
+        user_id_raw = value.get("user_id")
+        group_id_raw = value.get("group_id")
+        user_id = str(user_id_raw).strip() if user_id_raw is not None else None
+        group_id = str(group_id_raw).strip() if group_id_raw is not None else None
+        return GraphRow(
+            subject=subject,
+            relation=relation,
+            obj=obj,
+            confidence=max(0.0, min(1.0, confidence)),
+            event_id=event_id,
+            timestamp=timestamp,
+            user_id=user_id or None,
+            group_id=group_id or None,
+        )
 
 
 def _tokenize_text(text: str) -> set[str]:

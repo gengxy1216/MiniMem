@@ -78,7 +78,7 @@ GET /api/v1/memories/search?query=your+search+query&limit=10
 |-----------|------|---------|-------------|
 | `query` | string | required | Search query |
 | `limit` | int | 10 | Max results |
-| `profile` | string | "balanced" | Retrieval profile |
+| `profile` | string | "agentic" | Retrieval profile (`keyword` / `hybrid` / `agentic`) |
 
 **Response:**
 ```json

@@ -1,0 +1,4 @@
+interface:
+  display_name: "MiniMem MCP"
+  short_description: "Integrate MiniMem MCP server for cross-agent memory retrieval."
+  default_prompt: "Use this skill to run and integrate the MiniMem MCP server for memory search, chat, and graph queries."

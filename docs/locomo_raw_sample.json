@@ -1,0 +1,29 @@
+[
+  {
+    "case_id": "locomo-demo-1",
+    "user_id": "zhangming",
+    "group_id": "g-family",
+    "conversation": [
+      {
+        "turn_id": "t1",
+        "speaker": "zhangming",
+        "text": "我儿子叫团团，最近在学游泳。"
+      },
+      {
+        "turn_id": "t2",
+        "speaker": "zhangming",
+        "text": "春节我和家人去了三亚。"
+      }
+    ],
+    "qa": [
+      {
+        "question": "我儿子叫什么？",
+        "supporting_turn_ids": ["t1"]
+      },
+      {
+        "question": "我春节去哪儿了？",
+        "supporting_turn_ids": ["t2"]
+      }
+    ]
+  }
+]

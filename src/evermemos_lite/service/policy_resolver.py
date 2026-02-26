@@ -18,9 +18,9 @@ class PolicyResolver:
         self.repo = repo
 
     def resolve(self, payload: ResolveInput) -> EffectivePolicy:
-        default_profile = payload.default_profile or "medium"
+        default_profile = payload.default_profile or "agentic"
         if default_profile not in PROFILE_PRESETS:
-            default_profile = "medium"
+            default_profile = "agentic"
 
         base = PROFILE_PRESETS[default_profile].to_policy()
         tenant_patch = self.repo.get(payload.tenant_id)
