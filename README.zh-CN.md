@@ -143,6 +143,13 @@ powershell -ExecutionPolicy Bypass -File integrations/openclaw-plugin/install.ps
 bash integrations/openclaw-plugin/install.sh
 ```
 
+或使用分发插件包安装：
+
+```bash
+openclaw plugins install openclaw-plugin-minimem
+openclaw plugins enable minimem-memory
+```
+
 进阶插件配置示例：
 
 ```json

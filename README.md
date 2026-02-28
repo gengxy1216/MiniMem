@@ -156,6 +156,13 @@ powershell -ExecutionPolicy Bypass -File integrations/openclaw-plugin/install.ps
 bash integrations/openclaw-plugin/install.sh
 ```
 
+Or install distributed plugin package:
+
+```bash
+openclaw plugins install openclaw-plugin-minimem
+openclaw plugins enable minimem-memory
+```
+
 Advanced entry example:
 
 ```json

@@ -16,6 +16,34 @@ Prerequisites:
 - MiniMem running at `http://127.0.0.1:20195` (or your custom URL)
 - OpenClaw already initialized (`~/.openclaw/openclaw.json` exists)
 
+### Option A: Install from npm (recommended for distribution)
+
+```bash
+openclaw plugins install openclaw-plugin-minimem
+openclaw plugins enable minimem-memory
+```
+
+Then set minimal config in `~/.openclaw/openclaw.json`:
+
+```json
+{
+  "plugins": {
+    "slots": { "memory": "minimem-memory" },
+    "entries": {
+      "minimem-memory": {
+        "enabled": true,
+        "config": {
+          "baseUrl": "http://127.0.0.1:20195",
+          "groupStrategy": "per_role"
+        }
+      }
+    }
+  }
+}
+```
+
+### Option B: Install from local path
+
 Install and enable:
 
 ```powershell
@@ -42,6 +70,20 @@ Default installation keeps config minimal and practical:
 - auto compression capture: on
 
 This means most users can start without editing config.
+
+## Publish to npm
+
+```bash
+cd integrations/openclaw-plugin
+npm run pack:check
+npm publish
+```
+
+If login is required:
+
+```bash
+npm adduser
+```
 
 ## Group Strategy (Keep Per-Role Support)
 

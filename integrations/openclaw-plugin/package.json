@@ -1,11 +1,35 @@
 {
-  "name": "minimem-memory",
+  "name": "openclaw-plugin-minimem",
   "version": "0.1.0",
-  "private": true,
   "type": "module",
   "main": "index.ts",
+  "license": "MIT",
+  "author": "MiniMem",
+  "homepage": "https://github.com/gengxy1216/MiniMem/tree/main/integrations/openclaw-plugin",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gengxy1216/MiniMem.git",
+    "directory": "integrations/openclaw-plugin"
+  },
+  "bugs": {
+    "url": "https://github.com/gengxy1216/MiniMem/issues"
+  },
   "openclaw": {
     "extensions": ["./index.ts"]
+  },
+  "keywords": [
+    "openclaw",
+    "plugin",
+    "memory",
+    "minimem",
+    "agent"
+  ],
+  "scripts": {
+    "pack:check": "npm pack --dry-run",
+    "pack": "npm pack"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "files": [
     "index.ts",
