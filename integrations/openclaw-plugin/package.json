@@ -1,0 +1,19 @@
+{
+  "name": "minimem-memory",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "index.ts",
+  "openclaw": {
+    "extensions": ["./index.ts"]
+  },
+  "files": [
+    "index.ts",
+    "openclaw.plugin.json",
+    "README.md",
+    "install.ps1",
+    "install.sh",
+    "examples/AGENTS.memory-policy.md"
+  ],
+  "description": "Lightweight MiniMem bridge plugin for OpenClaw gateway"
+}

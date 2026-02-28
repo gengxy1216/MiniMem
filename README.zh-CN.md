@@ -116,6 +116,50 @@ python C:/Users/user/.agents/skills/skill-creator/scripts/package_skill.py skill
 - `MINIMEM_GROUP_ID`
 - `MINIMEM_BEARER_TOKEN` 或 `MINIMEM_BASIC_USER` + `MINIMEM_BASIC_PASSWORD`
 
+## OpenClaw 插件集成
+
+MiniMem 也提供了轻量 OpenClaw 插件桥接：
+
+- 插件目录：`integrations/openclaw-plugin`
+- 插件清单：`integrations/openclaw-plugin/openclaw.plugin.json`
+- 使用文档：`integrations/openclaw-plugin/README.md`
+- 策略模板：`integrations/openclaw-plugin/examples/AGENTS.memory-policy.md`
+
+核心能力：
+
+- 写入对话记录 / bot 画像 / 上下文压缩到 MiniMem
+- 按策略检索记忆（`keyword`/`vector`/`hybrid`/`rrf`/`agentic`）
+- 返回 `context_for_agent` 供 agent 上下文注入
+- 可选自动写入（`agent_end`）与自动注入（`before_agent_start`）
+- 支持分角色 / 共享组 / 按用户三种分组策略
+
+一键安装：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File integrations/openclaw-plugin/install.ps1
+```
+
+```bash
+bash integrations/openclaw-plugin/install.sh
+```
+
+进阶插件配置示例：
+
+```json
+{
+  "path": "C:/MiniMem-main/MiniMem/integrations/openclaw-plugin",
+  "enabled": true,
+  "config": {
+    "baseUrl": "http://127.0.0.1:20195",
+    "groupStrategy": "per_role",
+    "sharedGroupId": "shared:team",
+    "autoSenderFromAgent": true,
+    "autoInjectOnStart": true,
+    "autoCaptureOnEnd": true
+  }
+}
+```
+
 ## 架构分层（L0 -> L2）
 
 MiniMem 使用分层记忆架构，在简单性、召回质量和检索性能之间做平衡：

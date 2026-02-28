@@ -129,6 +129,50 @@ Environment variables (optional):
 - `MINIMEM_GROUP_ID`
 - `MINIMEM_BEARER_TOKEN` or `MINIMEM_BASIC_USER` + `MINIMEM_BASIC_PASSWORD`
 
+## OpenClaw Plugin Integration
+
+MiniMem also provides a lightweight OpenClaw plugin bridge:
+
+- Plugin path: `integrations/openclaw-plugin`
+- Plugin manifest: `integrations/openclaw-plugin/openclaw.plugin.json`
+- Plugin doc: `integrations/openclaw-plugin/README.md`
+- Policy template: `integrations/openclaw-plugin/examples/AGENTS.memory-policy.md`
+
+Core capabilities:
+
+- write dialogue / bot profile / context compression into MiniMem
+- retrieve memory by strategy (`keyword`/`vector`/`hybrid`/`rrf`/`agentic`)
+- return `context_for_agent` for prompt injection
+- optional auto capture (`agent_end`) and auto inject (`before_agent_start`)
+- role-based / shared / per-user group strategies
+
+One-command install:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File integrations/openclaw-plugin/install.ps1
+```
+
+```bash
+bash integrations/openclaw-plugin/install.sh
+```
+
+Advanced entry example:
+
+```json
+{
+  "path": "C:/MiniMem-main/MiniMem/integrations/openclaw-plugin",
+  "enabled": true,
+  "config": {
+    "baseUrl": "http://127.0.0.1:20195",
+    "groupStrategy": "per_role",
+    "sharedGroupId": "shared:team",
+    "autoSenderFromAgent": true,
+    "autoInjectOnStart": true,
+    "autoCaptureOnEnd": true
+  }
+}
+```
+
 ## Architecture 🏗️
 
 ```

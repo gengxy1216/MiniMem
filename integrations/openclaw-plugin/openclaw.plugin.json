@@ -1,0 +1,127 @@
+{
+  "id": "minimem-memory",
+  "name": "MiniMem Memory Bridge",
+  "version": "0.1.0",
+  "description": "Lightweight OpenClaw plugin for MiniMem memory write/retrieve and cross-session context recall.",
+  "author": "MiniMem",
+  "kind": "memory",
+  "entry": "./index.ts",
+  "permissions": {
+    "network": true,
+    "fileSystem": false,
+    "hooks": ["before_agent_start", "agent_end"]
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "baseUrl": {
+        "type": "string",
+        "default": "http://127.0.0.1:20195",
+        "description": "MiniMem API base URL"
+      },
+      "timeoutMs": {
+        "type": "integer",
+        "minimum": 1000,
+        "maximum": 120000,
+        "default": 25000
+      },
+      "bearerToken": {
+        "type": "string",
+        "description": "Optional MiniMem bearer token"
+      },
+      "basicUser": {
+        "type": "string",
+        "description": "Optional MiniMem basic auth username"
+      },
+      "basicPassword": {
+        "type": "string",
+        "description": "Optional MiniMem basic auth password"
+      },
+      "defaultUserId": {
+        "type": "string",
+        "description": "Default retrieval user scope"
+      },
+      "defaultGroupId": {
+        "type": "string",
+        "description": "Default retrieval group scope"
+      },
+      "defaultSender": {
+        "type": "string",
+        "default": "openclaw-bot",
+        "description": "Default sender used when writing memory"
+      },
+      "defaultTopK": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100,
+        "default": 8
+      },
+      "defaultRetrieveMethod": {
+        "type": "string",
+        "enum": ["keyword", "vector", "hybrid", "rrf", "agentic"],
+        "default": "agentic"
+      },
+      "defaultDecisionMode": {
+        "type": "string",
+        "enum": ["static", "rule", "agent"],
+        "default": "rule"
+      },
+      "groupStrategy": {
+        "type": "string",
+        "enum": ["shared", "per_role", "per_user"],
+        "default": "per_role",
+        "description": "How to assign group_id when request doesn't provide one"
+      },
+      "sharedGroupId": {
+        "type": "string",
+        "default": "shared:openclaw",
+        "description": "Shared group id used when groupStrategy=shared"
+      },
+      "autoSenderFromAgent": {
+        "type": "boolean",
+        "default": true,
+        "description": "Infer sender/user from agent id and session key when possible"
+      },
+      "autoInjectOnStart": {
+        "type": "boolean",
+        "default": true,
+        "description": "Automatically prepend recalled memory context before agent start"
+      },
+      "bootstrapQuery": {
+        "type": "string",
+        "description": "Optional fixed query used for startup recall"
+      },
+      "bootstrapTopK": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 20,
+        "default": 6
+      },
+      "autoCaptureOnEnd": {
+        "type": "boolean",
+        "default": true,
+        "description": "Persist latest dialogue turn at agent end"
+      },
+      "autoCaptureCompression": {
+        "type": "boolean",
+        "default": true,
+        "description": "Persist compact context summary at agent end"
+      },
+      "compressionMaxChars": {
+        "type": "integer",
+        "minimum": 200,
+        "maximum": 12000,
+        "default": 2500
+      },
+      "debug": {
+        "type": "boolean",
+        "default": false
+      }
+    }
+  },
+  "uiHints": {
+    "category": "memory",
+    "icon": "database"
+  }
+}
