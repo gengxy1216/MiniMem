@@ -35,6 +35,8 @@ tmp_test_runtime/
 .tmp_ci/
 .tmp_test/
 .tmp_probe*/
+tmp_*
+tmp_*/
 
 # Local test artifacts / scratch outputs (keep test source files tracked)
 test/
