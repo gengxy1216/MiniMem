@@ -33,7 +33,29 @@ MiniMem 不只是单个助手的“记忆库”，而是面向协作系统的记
 
 ## 快速开始
 
-一键安装并启动：
+一键安装：
+
+`pip`：
+
+```bash
+pip install minimem
+minimem
+```
+
+`npm`：
+
+```bash
+npm install openclaw-plugin-minimem
+```
+
+`OpenClaw 插件`：
+
+```bash
+openclaw plugins install openclaw-plugin-minimem
+openclaw plugins enable minimem-memory
+```
+
+本地安装（保留）：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/install.ps1 -RunAfterInstall
@@ -43,7 +65,7 @@ powershell -ExecutionPolicy Bypass -File scripts/install.ps1 -RunAfterInstall
 bash scripts/install.sh --run
 ```
 
-Windows 双击启动文件：`start_minimem.bat`
+Windows 双击启动文件：`start_minimem.bat`  
 
 或手动安装：
 

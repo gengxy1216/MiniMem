@@ -19,7 +19,7 @@ Prerequisites:
 ### Option A: Install from npm (recommended for distribution)
 
 ```bash
-openclaw plugins install @gengxy1216/minimem-memory
+openclaw plugins install openclaw-plugin-minimem
 openclaw plugins enable minimem-memory
 ```
 

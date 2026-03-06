@@ -36,6 +36,28 @@ MiniMem is not just a memory store for a single assistant. It provides:
 
 ### One-click Install
 
+`pip`:
+
+```bash
+pip install minimem
+minimem
+```
+
+`npm`:
+
+```bash
+npm install openclaw-plugin-minimem
+```
+
+`openclaw plugin`:
+
+```bash
+openclaw plugins install openclaw-plugin-minimem
+openclaw plugins enable minimem-memory
+```
+
+Local install (kept):
+
 | Platform | Command |
 |----------|---------|
 | 🪟 **Windows** | `powershell -ExecutionPolicy Bypass -File scripts/install.ps1 -RunAfterInstall` |
@@ -173,7 +195,7 @@ bash integrations/openclaw-plugin/install.sh
 Or install distributed plugin package:
 
 ```bash
-openclaw plugins install @gengxy1216/minimem-memory
+openclaw plugins install openclaw-plugin-minimem
 openclaw plugins enable minimem-memory
 ```
 
