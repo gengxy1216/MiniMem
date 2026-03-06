@@ -13,17 +13,13 @@ MiniMem_data/
 *.db
 *.kuzu
 
-# Local research / operation planning docs
-docs/github-growth-checklist.md
-docs/OPEN_SOURCE_PLAYBOOK.md
-docs/RELEASING.md
-docs/openclaw-semantic-hub-plan.md
-docs/*-20[0-9][0-9][0-1][0-9][0-3][0-9].md
-docs/*计划*.md
-docs/*清单*.md
-docs/*差距*.md
-docs/*补齐*.md
-docs/*指导*.md
+# Keep only docs/assets and docs/reference tracked
+docs/*
+!docs/assets/
+!docs/assets/**
+!docs/reference/
+!docs/reference/**
+
 everMemOs.pdf
 tmp_paper.txt
 
@@ -51,5 +47,15 @@ tests/**/*.db
 tests/**/*.db-*
 tests/**/*.sqlite
 tests/**/*.sqlite-*
+
+# Local agent-client workspace mirrors (canonical skill source is /skills)
+.agent/
+.agents/
+.augment/
+.iflow/
+.kiro/
+.qoder/
+.qwen/
+.trae/
 
 
