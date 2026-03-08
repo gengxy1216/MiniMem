@@ -1377,6 +1377,6 @@ export default function minimemOpenclawPlugin(api: any) {
 
   return {
     name: "FlockMem Memory Bridge",
-    version: "0.1.3",
+    version: "0.2.0",
   };
 }

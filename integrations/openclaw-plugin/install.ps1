@@ -269,7 +269,7 @@ $install = $installs."flockmem-memory"
 Set-ObjectProperty -Object $install -Name "source" -Value "path"
 Set-ObjectProperty -Object $install -Name "sourcePath" -Value $scriptDir
 Set-ObjectProperty -Object $install -Name "installPath" -Value $targetDir
-Set-ObjectProperty -Object $install -Name "version" -Value "0.1.3"
+Set-ObjectProperty -Object $install -Name "version" -Value "0.2.0"
 Set-ObjectProperty -Object $install -Name "installedAt" -Value ((Get-Date).ToUniversalTime().ToString("o"))
 
 $config | ConvertTo-Json -Depth 32 | Set-Content -Path $configPath -Encoding UTF8

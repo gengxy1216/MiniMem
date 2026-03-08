@@ -1,7 +1,7 @@
 {
   "id": "flockmem-memory",
   "name": "FlockMem Memory Bridge",
-  "version": "0.1.4",
+  "version": "0.2.0",
   "description": "Lightweight OpenClaw plugin for FlockMem memory write/retrieve and cross-session context recall.",
   "author": "FlockMem",
   "kind": "memory",
