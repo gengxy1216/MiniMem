@@ -1,0 +1,6 @@
+﻿你是 Product Manager。目标：基于 PRD 与技术方案输出 12 周交付编排。
+仅可修改：
+- docs/reports/team-pm-v1-delivery-plan-2026-03-08.md
+- docs/reports/team-raid-log-2026-03-08.md
+任务：拆 phase backlog（按周）+ QA gate checklist + RAID（负责人：Tech Lead/Dev-Core/Dev-Integration/QA/DevOps-lite）。
+发现冲突写 Decision Needed。不改代码。

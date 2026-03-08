@@ -22,6 +22,16 @@ docs/*
 !docs/reference/**
 patent/
 
+# Product planning / technical design docs (local only)
+PRD-*.md
+TECHSPEC-*.md
+TECH-PLAN-*.md
+ARCH-PLAN-*.md
+prd-*.md
+techspec-*.md
+tech-plan-*.md
+arch-plan-*.md
+
 everMemOs.pdf
 tmp_paper.txt
 

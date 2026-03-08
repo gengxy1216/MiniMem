@@ -64,6 +64,8 @@ const RETRIEVE_METHODS = new Set<RetrieveMethod>([
   "agentic",
 ]);
 const DECISION_MODES = new Set<DecisionMode>(["static", "rule", "agent"]);
+const RUNTIME_PROFILE_NAMES = new Set(["balanced", "recall", "keyword", "hybrid", "agentic"]);
+const COORDINATION_MODES = new Set(["federated_acp", "inruntime_a2a"]);
 const GROUP_STRATEGIES = new Set<GroupStrategy>(["shared", "per_role", "per_user"]);
 const COMPRESSION_MODES = new Set<CompressionMode>(["truncate", "llm_summary", "hybrid"]);
 const MEMORY_TYPES = new Set<MemoryType>([
@@ -169,6 +171,12 @@ function normalizeToolInput(value: unknown): Record<string, unknown> {
     "top_k",
     "message_id",
     "create_time",
+    "coordination_mode",
+    "coordination_id",
+    "runtime_id",
+    "subagent_id",
+    "team_id",
+    "session_id",
   ]);
   for (const item of candidates) {
     for (const key of Object.keys(item)) {
@@ -209,6 +217,24 @@ function extractExecuteInput(args: unknown[]): Record<string, unknown> {
       }
       if (!hints.trace_id) {
         hints.trace_id = item.trace_id || item.traceId || item.request_id || item.requestId;
+      }
+      if (!hints.coordination_mode) {
+        hints.coordination_mode = item.coordination_mode || item.coordinationMode;
+      }
+      if (!hints.coordination_id) {
+        hints.coordination_id = item.coordination_id || item.coordinationId;
+      }
+      if (!hints.runtime_id) {
+        hints.runtime_id = item.runtime_id || item.runtimeId;
+      }
+      if (!hints.subagent_id) {
+        hints.subagent_id = item.subagent_id || item.subagentId;
+      }
+      if (!hints.team_id) {
+        hints.team_id = item.team_id || item.teamId;
+      }
+      if (!hints.session_id) {
+        hints.session_id = item.session_id || item.sessionId;
       }
     }
   }
@@ -534,6 +560,130 @@ function inferTraceId(event: any): string {
   return "";
 }
 
+function inferCoordinationMode(event: any): string {
+  const candidates = [
+    event?.coordination_mode,
+    event?.coordinationMode,
+    event?.run?.coordination_mode,
+    event?.run?.coordinationMode,
+    event?.session?.coordination_mode,
+    event?.session?.coordinationMode,
+  ];
+  for (const item of candidates) {
+    const value = toStr(item).toLowerCase();
+    if (value && COORDINATION_MODES.has(value)) {
+      return value;
+    }
+  }
+  return "";
+}
+
+function inferCoordinationId(event: any): string {
+  const candidates = [
+    event?.coordination_id,
+    event?.coordinationId,
+    event?.run?.coordination_id,
+    event?.run?.coordinationId,
+    event?.session?.coordination_id,
+    event?.session?.coordinationId,
+  ];
+  for (const item of candidates) {
+    const value = toStr(item);
+    if (value) {
+      return value;
+    }
+  }
+  return "";
+}
+
+function inferRuntimeId(event: any): string {
+  const candidates = [
+    event?.runtime_id,
+    event?.runtimeId,
+    event?.runtime?.id,
+    event?.run?.runtime_id,
+    event?.run?.runtimeId,
+    event?.session?.runtime_id,
+    event?.session?.runtimeId,
+    event?.runtime,
+  ];
+  for (const item of candidates) {
+    const value = toStr(item);
+    if (value) {
+      return value;
+    }
+  }
+  return "";
+}
+
+function inferSubagentId(event: any): string {
+  const candidates = [
+    event?.subagent_id,
+    event?.subagentId,
+    event?.subagent?.id,
+    event?.run?.subagent_id,
+    event?.run?.subagentId,
+    event?.run?.subagent?.id,
+    event?.session?.subagent_id,
+    event?.session?.subagentId,
+    event?.session?.subagent?.id,
+  ];
+  for (const item of candidates) {
+    const value = toStr(item);
+    if (value) {
+      return value;
+    }
+  }
+  return "";
+}
+
+function inferTeamId(event: any): string {
+  const candidates = [
+    event?.team_id,
+    event?.teamId,
+    event?.team?.id,
+    event?.run?.team_id,
+    event?.run?.teamId,
+    event?.run?.team?.id,
+    event?.session?.team_id,
+    event?.session?.teamId,
+    event?.session?.team?.id,
+  ];
+  for (const item of candidates) {
+    const value = toStr(item);
+    if (value) {
+      return value;
+    }
+  }
+  return "";
+}
+
+function inferSessionId(event: any): string {
+  const candidates = [
+    event?.session_id,
+    event?.sessionId,
+    event?.sessionKey,
+    event?.session_key,
+    event?.run?.session_id,
+    event?.run?.sessionId,
+    event?.run?.sessionKey,
+    event?.run?.session_key,
+    event?.session?.id,
+    event?.session?.sessionId,
+    event?.session?.session_id,
+    event?.session?.sessionKey,
+    event?.session?.session_key,
+    event?.session?.key,
+  ];
+  for (const item of candidates) {
+    const value = toStr(item);
+    if (value) {
+      return value;
+    }
+  }
+  return "";
+}
+
 function defaultGroupIdByStrategy(cfg: PluginConfig, sender: string, userId: string): string {
   if (cfg.groupStrategy === "shared") {
     return cfg.sharedGroupId || "shared:openclaw";
@@ -639,6 +789,7 @@ function buildRoutingMetadata(
   input: Record<string, unknown>,
   scope: {
     agentId: string;
+    groupId: string;
     channel: string;
     aclFallback: boolean;
   }
@@ -663,7 +814,66 @@ function buildRoutingMetadata(
   if (scope.aclFallback) {
     base.route_acl_fallback = true;
   }
+  const envelope = buildCollectiveEnvelope(input, scope);
+  for (const [key, value] of Object.entries(envelope)) {
+    if (!value) {
+      continue;
+    }
+    base[key] = value;
+  }
   return base;
+}
+
+type CollectiveEnvelope = {
+  coordination_mode?: string;
+  coordination_id?: string;
+  runtime_id?: string;
+  agent_id?: string;
+  subagent_id?: string;
+  team_id?: string;
+  session_id?: string;
+};
+
+function buildCollectiveEnvelope(
+  input: Record<string, unknown>,
+  scope: {
+    agentId: string;
+    groupId: string;
+  }
+): CollectiveEnvelope {
+  const envelope: CollectiveEnvelope = {};
+  const coordinationMode = toStr(input.coordination_mode).toLowerCase();
+  if (coordinationMode) {
+    if (!COORDINATION_MODES.has(coordinationMode)) {
+      throw new Error(`invalid coordination_mode: ${coordinationMode}`);
+    }
+    envelope.coordination_mode = coordinationMode;
+  }
+  const coordinationId = toStr(input.coordination_id);
+  if (coordinationId) {
+    envelope.coordination_id = coordinationId;
+  }
+  const runtimeId = toStr(input.runtime_id) || "openclaw";
+  if (runtimeId) {
+    envelope.runtime_id = runtimeId;
+  }
+  const agentId = toStr(input.agent_id) || scope.agentId;
+  if (agentId) {
+    envelope.agent_id = agentId;
+  }
+  const subagentId = toStr(input.subagent_id);
+  if (subagentId) {
+    envelope.subagent_id = subagentId;
+  }
+  const teamId = toStr(input.team_id) || scope.groupId;
+  if (teamId) {
+    envelope.team_id = teamId;
+  }
+  const sessionId = toStr(input.session_id) || toStr(input.session_key);
+  if (sessionId) {
+    envelope.session_id = sessionId;
+  }
+  return envelope;
 }
 
 function debugLog(cfg: PluginConfig, label: string, payload: Record<string, unknown>): void {
@@ -1047,6 +1257,7 @@ export default function minimemOpenclawPlugin(api: any) {
       ...input,
       operation: "write",
     });
+    const envelope = buildCollectiveEnvelope(input, scope);
     const metadata = buildRoutingMetadata(input, scope);
     const prepared = buildWriteContent({
       ...input,
@@ -1068,6 +1279,7 @@ export default function minimemOpenclawPlugin(api: any) {
         role,
         group_id: scope.groupId,
         content: prepared.content,
+        ...envelope,
       },
     });
   }
@@ -1086,7 +1298,12 @@ export default function minimemOpenclawPlugin(api: any) {
     const topK = Number.isFinite(topKRaw) ? Math.floor(topKRaw) : cfg.defaultTopK;
     const retrieveMethod = (toStr(input.retrieve_method) || cfg.defaultRetrieveMethod) as RetrieveMethod;
     const decisionMode = (toStr(input.decision_mode) || cfg.defaultDecisionMode) as DecisionMode;
-    const runtimeProfile = toStr(input.runtime_profile);
+    const runtimeProfileRaw = toStr(input.runtime_profile).toLowerCase();
+    if (runtimeProfileRaw && !RUNTIME_PROFILE_NAMES.has(runtimeProfileRaw)) {
+      throw new Error(`invalid runtime_profile: ${runtimeProfileRaw}`);
+    }
+    const runtimeProfile = runtimeProfileRaw;
+    const envelope = buildCollectiveEnvelope(input, scope);
     const response = await requestJson(cfg, "GET", "/api/v1/memories/search", {
       params: {
         query,
@@ -1100,6 +1317,7 @@ export default function minimemOpenclawPlugin(api: any) {
           ? decisionMode
           : cfg.defaultDecisionMode,
         runtime_profile: runtimeProfile || undefined,
+        ...envelope,
       },
     });
     const rows = normalizeMemories(response);
@@ -1118,9 +1336,95 @@ export default function minimemOpenclawPlugin(api: any) {
         agent_id: scope.agentId,
         channel: scope.channel,
         acl_fallback: scope.aclFallback,
+        ...envelope,
       },
       raw: response,
     };
+  }
+
+  async function collectiveIngest(input: Record<string, unknown>): Promise<any> {
+    const cfg = currentConfig();
+    const scopeType = toStr(input.scope_type).toLowerCase();
+    if (!scopeType) {
+      throw new Error("scope_type is required");
+    }
+    const scope = resolveScope(cfg, {
+      ...input,
+      operation: "write",
+    });
+    const contentRaw = input.content;
+    let content: Record<string, unknown>;
+    if (isObject(contentRaw)) {
+      content = contentRaw;
+    } else {
+      const text = toStr(contentRaw);
+      if (!text) {
+        throw new Error("content is required");
+      }
+      content = { text };
+    }
+    const body: Record<string, unknown> = {
+      knowledge_id: toStr(input.knowledge_id) || undefined,
+      revision_id: toStr(input.revision_id) || undefined,
+      parent_revision_id: toStr(input.parent_revision_id) || undefined,
+      scope_type: scopeType,
+      scope_id: toStr(input.scope_id) || scope.groupId,
+      content,
+      change_type: toStr(input.change_type).toLowerCase() || "update",
+      changed_by: toStr(input.changed_by).toLowerCase() || "agent",
+      actor_id: toStr(input.actor_id) || scope.agentId || scope.sender,
+      confidence: Number(input.confidence) || 0.6,
+      trust_score: Number(input.trust_score) || 0.5,
+      read_acl: Array.isArray(input.read_acl) ? input.read_acl : [],
+      write_acl: Array.isArray(input.write_acl) ? input.write_acl : [],
+      evidence: Array.isArray(input.evidence) ? input.evidence : [],
+      ...buildCollectiveEnvelope(input, scope),
+    };
+    return requestJson(cfg, "POST", "/api/v1/collective/ingest", { body });
+  }
+
+  async function collectiveContext(input: Record<string, unknown>): Promise<any> {
+    const cfg = currentConfig();
+    const scope = resolveScope(cfg, {
+      ...input,
+      operation: "read",
+    });
+    const topKRaw = Number(input.top_k);
+    const topK = Number.isFinite(topKRaw) ? Math.floor(topKRaw) : cfg.defaultTopK;
+    const body: Record<string, unknown> = {
+      query: toStr(input.query) || undefined,
+      actor_id: toStr(input.actor_id) || scope.agentId || undefined,
+      personal_scope_id: toStr(input.personal_scope_id) || undefined,
+      team_scope_id: toStr(input.team_scope_id) || undefined,
+      include_global: input.include_global !== false,
+      top_k: Math.max(1, Math.min(100, topK)),
+      ...buildCollectiveEnvelope(input, scope),
+    };
+    return requestJson(cfg, "POST", "/api/v1/collective/context", { body });
+  }
+
+  async function collectiveFeedback(input: Record<string, unknown>): Promise<any> {
+    const cfg = currentConfig();
+    const scope = resolveScope(cfg, {
+      ...input,
+      operation: "write",
+    });
+    const feedbackPayload = isObject(input.feedback_payload) ? input.feedback_payload : {};
+    const body: Record<string, unknown> = {
+      knowledge_id: toStr(input.knowledge_id),
+      revision_id: toStr(input.revision_id) || undefined,
+      feedback_type: toStr(input.feedback_type),
+      feedback_payload: feedbackPayload,
+      actor: toStr(input.actor) || scope.agentId || scope.sender,
+      ...buildCollectiveEnvelope(input, scope),
+    };
+    if (!toStr(body.knowledge_id)) {
+      throw new Error("knowledge_id is required");
+    }
+    if (!toStr(body.feedback_type)) {
+      throw new Error("feedback_type is required");
+    }
+    return requestJson(cfg, "POST", "/api/v1/collective/feedback", { body });
   }
 
   api.registerTool({
@@ -1146,6 +1450,12 @@ export default function minimemOpenclawPlugin(api: any) {
         channel: { type: "string" },
         task_id: { type: "string" },
         trace_id: { type: "string" },
+        coordination_mode: { type: "string", enum: ["federated_acp", "inruntime_a2a"] },
+        coordination_id: { type: "string" },
+        runtime_id: { type: "string" },
+        subagent_id: { type: "string" },
+        team_id: { type: "string" },
+        session_id: { type: "string" },
         message_id: { type: "string" },
         create_time: { type: "integer" },
         metadata: { type: "object", additionalProperties: true },
@@ -1189,10 +1499,95 @@ export default function minimemOpenclawPlugin(api: any) {
         channel: { type: "string" },
         task_id: { type: "string" },
         trace_id: { type: "string" },
+        coordination_mode: { type: "string", enum: ["federated_acp", "inruntime_a2a"] },
+        coordination_id: { type: "string" },
+        runtime_id: { type: "string" },
+        subagent_id: { type: "string" },
+        team_id: { type: "string" },
+        session_id: { type: "string" },
       },
     },
     execute: async (...runtimeArgs: unknown[]) =>
       retrieveMemory(extractExecuteInput(runtimeArgs)),
+  });
+
+  const collectiveEnvelopeProps = {
+    coordination_mode: {
+      type: "string",
+      enum: ["federated_acp", "inruntime_a2a"],
+    },
+    coordination_id: { type: "string" },
+    runtime_id: { type: "string" },
+    agent_id: { type: "string" },
+    subagent_id: { type: "string" },
+    team_id: { type: "string" },
+    session_id: { type: "string" },
+  };
+
+  api.registerTool({
+    name: "minimem_collective_ingest",
+    description: "Ingest knowledge revision via collective contract with envelope passthrough.",
+    parameters: {
+      type: "object",
+      required: ["scope_type", "content"],
+      properties: {
+        knowledge_id: { type: "string" },
+        revision_id: { type: "string" },
+        parent_revision_id: { type: "string" },
+        scope_type: { type: "string", enum: ["personal", "team", "global"] },
+        scope_id: { type: "string" },
+        content: { type: ["object", "string"] },
+        change_type: { type: "string", enum: ["create", "update", "deprecate", "rollback"] },
+        changed_by: { type: "string", enum: ["agent", "user", "system"] },
+        actor_id: { type: "string" },
+        confidence: { type: "number", minimum: 0, maximum: 1 },
+        trust_score: { type: "number", minimum: 0, maximum: 1 },
+        read_acl: { type: "array", items: { type: "string" } },
+        write_acl: { type: "array", items: { type: "string" } },
+        evidence: { type: "array", items: { type: "object", additionalProperties: true } },
+        ...collectiveEnvelopeProps,
+      },
+    },
+    execute: async (...runtimeArgs: unknown[]) =>
+      collectiveIngest(extractExecuteInput(runtimeArgs)),
+  });
+
+  api.registerTool({
+    name: "minimem_collective_context",
+    description: "Resolve collective context with deterministic scope query and envelope passthrough.",
+    parameters: {
+      type: "object",
+      properties: {
+        query: { type: "string" },
+        actor_id: { type: "string" },
+        personal_scope_id: { type: "string" },
+        team_scope_id: { type: "string" },
+        include_global: { type: "boolean", default: true },
+        top_k: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+        ...collectiveEnvelopeProps,
+      },
+    },
+    execute: async (...runtimeArgs: unknown[]) =>
+      collectiveContext(extractExecuteInput(runtimeArgs)),
+  });
+
+  api.registerTool({
+    name: "minimem_collective_feedback",
+    description: "Submit collective feedback signals with envelope passthrough.",
+    parameters: {
+      type: "object",
+      required: ["knowledge_id", "feedback_type", "feedback_payload"],
+      properties: {
+        knowledge_id: { type: "string" },
+        revision_id: { type: "string" },
+        feedback_type: { type: "string" },
+        feedback_payload: { type: "object", additionalProperties: true },
+        actor: { type: "string" },
+        ...collectiveEnvelopeProps,
+      },
+    },
+    execute: async (...runtimeArgs: unknown[]) =>
+      collectiveFeedback(extractExecuteInput(runtimeArgs)),
   });
 
   if (typeof api.on === "function") {
@@ -1206,6 +1601,12 @@ export default function minimemOpenclawPlugin(api: any) {
         const channel = inferChannel(event);
         const taskId = inferTaskId(event);
         const traceId = inferTraceId(event);
+        const coordinationMode = inferCoordinationMode(event);
+        const coordinationId = inferCoordinationId(event);
+        const runtimeId = inferRuntimeId(event);
+        const subagentId = inferSubagentId(event);
+        const teamId = inferTeamId(event);
+        const sessionId = inferSessionId(event);
         const scope = resolveScope(cfg, {
           agent_id: agentId,
           session_key: event?.sessionKey,
@@ -1213,7 +1614,18 @@ export default function minimemOpenclawPlugin(api: any) {
           operation: "read",
         });
         debugLog(cfg, "before_agent_start.scope", {
-          inferred: { agentId, channel, taskId, traceId },
+          inferred: {
+            agentId,
+            channel,
+            taskId,
+            traceId,
+            coordinationMode,
+            coordinationId,
+            runtimeId,
+            subagentId,
+            teamId,
+            sessionId,
+          },
           event: {
             sessionKey: toStr(event?.sessionKey),
             session_key: toStr(event?.session_key),
@@ -1243,6 +1655,12 @@ export default function minimemOpenclawPlugin(api: any) {
           channel,
           task_id: taskId,
           trace_id: traceId,
+          coordination_mode: coordinationMode || undefined,
+          coordination_id: coordinationId || undefined,
+          runtime_id: runtimeId || undefined,
+          subagent_id: subagentId || undefined,
+          team_id: teamId || undefined,
+          session_id: sessionId || undefined,
         });
         const injectLatencyMs = Date.now() - injectStartMs;
         debugLog(cfg, "before_agent_start.inject_latency", {
@@ -1276,6 +1694,12 @@ export default function minimemOpenclawPlugin(api: any) {
         const channel = inferChannel(event);
         const taskId = inferTaskId(event);
         const traceId = inferTraceId(event);
+        const coordinationMode = inferCoordinationMode(event);
+        const coordinationId = inferCoordinationId(event);
+        const runtimeId = inferRuntimeId(event);
+        const subagentId = inferSubagentId(event);
+        const teamId = inferTeamId(event);
+        const sessionId = inferSessionId(event);
         const scope = resolveScope(cfg, {
           agent_id: agentId,
           session_key: event?.sessionKey,
@@ -1283,7 +1707,18 @@ export default function minimemOpenclawPlugin(api: any) {
           operation: "write",
         });
         debugLog(cfg, "agent_end.scope", {
-          inferred: { agentId, channel, taskId, traceId },
+          inferred: {
+            agentId,
+            channel,
+            taskId,
+            traceId,
+            coordinationMode,
+            coordinationId,
+            runtimeId,
+            subagentId,
+            teamId,
+            sessionId,
+          },
           event: {
             sessionKey: toStr(event?.sessionKey),
             session_key: toStr(event?.session_key),
@@ -1314,18 +1749,30 @@ export default function minimemOpenclawPlugin(api: any) {
             role: "assistant",
             user_id: scope.userId,
             group_id: scope.groupId,
-            agent_id: scope.agentId,
-            channel,
-            task_id: taskId,
-            trace_id: traceId,
-            metadata: {
-              session_key: sessionKey || undefined,
-              agent_id: scope.agentId || undefined,
-              channel: channel || undefined,
-              task_id: taskId || undefined,
-              trace_id: traceId || undefined,
-            },
-          });
+              agent_id: scope.agentId,
+              channel,
+              task_id: taskId,
+              trace_id: traceId,
+              coordination_mode: coordinationMode || undefined,
+              coordination_id: coordinationId || undefined,
+              runtime_id: runtimeId || undefined,
+              subagent_id: subagentId || undefined,
+              team_id: teamId || undefined,
+              session_id: sessionId || undefined,
+              metadata: {
+                session_key: sessionKey || undefined,
+                agent_id: scope.agentId || undefined,
+                channel: channel || undefined,
+                task_id: taskId || undefined,
+                trace_id: traceId || undefined,
+                coordination_mode: coordinationMode || undefined,
+                coordination_id: coordinationId || undefined,
+                runtime_id: runtimeId || undefined,
+                subagent_id: subagentId || undefined,
+                team_id: teamId || undefined,
+                session_id: sessionId || undefined,
+              },
+            });
         }
         if (cfg.autoCaptureCompression) {
           const compression = await compressMessagesForCapture(cfg, event?.messages);
@@ -1347,19 +1794,31 @@ export default function minimemOpenclawPlugin(api: any) {
               role: "assistant",
               user_id: scope.userId,
               group_id: scope.groupId,
-              agent_id: scope.agentId,
-              channel,
-              task_id: taskId,
-              trace_id: traceId,
-              metadata: {
-                session_key: sessionKey || undefined,
-                agent_id: scope.agentId || undefined,
-                channel: channel || undefined,
-                task_id: taskId || undefined,
-                trace_id: traceId || undefined,
-                compression_mode_requested: compression.modeRequested,
-                compression_mode_used: compression.modeUsed,
-                compression_turn_count: compression.turnCount,
+                agent_id: scope.agentId,
+                channel,
+                task_id: taskId,
+                trace_id: traceId,
+                coordination_mode: coordinationMode || undefined,
+                coordination_id: coordinationId || undefined,
+                runtime_id: runtimeId || undefined,
+                subagent_id: subagentId || undefined,
+                team_id: teamId || undefined,
+                session_id: sessionId || undefined,
+                metadata: {
+                  session_key: sessionKey || undefined,
+                  agent_id: scope.agentId || undefined,
+                  channel: channel || undefined,
+                  task_id: taskId || undefined,
+                  trace_id: traceId || undefined,
+                  coordination_mode: coordinationMode || undefined,
+                  coordination_id: coordinationId || undefined,
+                  runtime_id: runtimeId || undefined,
+                  subagent_id: subagentId || undefined,
+                  team_id: teamId || undefined,
+                  session_id: sessionId || undefined,
+                  compression_mode_requested: compression.modeRequested,
+                  compression_mode_used: compression.modeUsed,
+                  compression_turn_count: compression.turnCount,
                 compression_source_chars: compression.sourceChars,
                 compression_latency_ms: compression.latencyMs,
                 compression_fallback_reason: compression.fallbackReason || undefined,

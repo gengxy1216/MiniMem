@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "schema_version": "1.0.0",
+  "runtime_profiles": [
+    "balanced",
+    "recall",
+    "keyword",
+    "hybrid",
+    "agentic"
+  ],
+  "coordination_modes": [
+    "federated_acp",
+    "inruntime_a2a"
+  ],
+  "envelope_fields": [
+    "coordination_mode",
+    "coordination_id",
+    "runtime_id",
+    "agent_id",
+    "subagent_id",
+    "team_id",
+    "session_id"
+  ],
+  "adapter_keysets": {
+    "mcp": {
+      "known_fields": [
+        "runtime_profile",
+        "coordination_mode",
+        "coordination_id",
+        "runtime_id",
+        "agent_id",
+        "subagent_id",
+        "team_id",
+        "session_id"
+      ],
+      "required_fields": []
+    },
+    "hook": {
+      "known_fields": [
+        "runtime_profile",
+        "coordination_mode",
+        "coordination_id",
+        "runtime_id",
+        "agent_id",
+        "subagent_id",
+        "team_id",
+        "session_id"
+      ],
+      "required_fields": []
+    },
+    "plugin": {
+      "known_fields": [
+        "runtime_profile",
+        "coordination_mode",
+        "coordination_id",
+        "runtime_id",
+        "agent_id",
+        "subagent_id",
+        "team_id",
+        "session_id"
+      ],
+      "required_fields": []
+    },
+    "cli_bridge": {
+      "known_fields": [
+        "runtime_profile",
+        "coordination_mode",
+        "coordination_id",
+        "runtime_id",
+        "agent_id",
+        "subagent_id",
+        "team_id",
+        "session_id"
+      ],
+      "required_fields": []
+    },
+    "webhook_bridge": {
+      "known_fields": [
+        "runtime_profile",
+        "coordination_mode",
+        "coordination_id",
+        "runtime_id",
+        "agent_id",
+        "subagent_id",
+        "team_id",
+        "session_id"
+      ],
+      "required_fields": []
+    }
+  }
+}

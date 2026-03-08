@@ -26,6 +26,9 @@
     "flockmem",
     "agent"
   ],
+  "engines": {
+    "node": ">=20 <21"
+  },
   "scripts": {
     "pack:check": "npm pack --dry-run",
     "pack": "npm pack",

@@ -1,0 +1,226 @@
+name: Collective Smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      strict_collective:
+        description: "Fail when /api/v1/collective/* endpoints are missing (404)"
+        required: false
+        default: false
+        type: boolean
+      strict_openclaw:
+        description: "Fail when openclaw CLI is unavailable"
+        required: false
+        default: false
+        type: boolean
+  pull_request:
+    branches: ["main", "master"]
+    paths:
+      - ".github/workflows/collective-smoke.yml"
+      - "scripts/smoke_collective_release.sh"
+      - "scripts/smoke_collective_release.ps1"
+      - "scripts/validate_collective_release.ps1"
+      - "tools/bench_collective_perf.py"
+      - "tools/benchmark_collective_baseline.py"
+      - "src/flockmem/**"
+      - "integrations/flockmem-mcp/**"
+      - "integrations/openclaw-plugin/**"
+
+jobs:
+  release-line-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Validate release line (MCP <-> plugin)
+        run: |
+          python - <<'PY'
+          import json
+          import pathlib
+          import tomllib
+
+          pyproject = pathlib.Path("integrations/flockmem-mcp/pyproject.toml")
+          package_json = pathlib.Path("integrations/openclaw-plugin/package.json")
+          plugin_manifest = pathlib.Path("integrations/openclaw-plugin/openclaw.plugin.json")
+
+          mcp_version = tomllib.loads(pyproject.read_text(encoding="utf-8"))["project"]["version"]
+          plugin_version = json.loads(package_json.read_text(encoding="utf-8"))["version"]
+          plugin_manifest_version = json.loads(plugin_manifest.read_text(encoding="utf-8"))["version"]
+
+          def release_line(version: str) -> str:
+              parts = version.split(".")
+              if len(parts) < 2:
+                  raise SystemExit(f"invalid semver for release-line check: {version}")
+              return ".".join(parts[:2])
+
+          if release_line(mcp_version) != release_line(plugin_version):
+              raise SystemExit(
+                  f"release-line mismatch: mcp={mcp_version} plugin={plugin_version}"
+              )
+
+          if plugin_version != plugin_manifest_version:
+              raise SystemExit(
+                  "plugin version mismatch: "
+                  f"package.json={plugin_version} openclaw.plugin.json={plugin_manifest_version}"
+              )
+
+          print(
+              "release-line ok:",
+              f"mcp={mcp_version}",
+              f"plugin={plugin_version}",
+              f"manifest={plugin_manifest_version}",
+          )
+          PY
+
+  smoke-linux:
+    runs-on: ubuntu-latest
+    needs: release-line-gate
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Python deps
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[test]"
+
+      - name: Run collective release validation (compat mode)
+        if: ${{ github.event_name != 'workflow_dispatch' }}
+        shell: pwsh
+        run: |
+          ./scripts/validate_collective_release.ps1 `
+            -StrictCollective `
+            -WriteChecklist `
+            -ChecklistPath "$env:RUNNER_TEMP/team-release-readiness-linux-2026-03-08.md"
+
+      - name: Run collective release validation (dispatch mode)
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        shell: pwsh
+        run: |
+          $args = @(
+            "-WriteChecklist",
+            "-ChecklistPath",
+            "$env:RUNNER_TEMP/team-release-readiness-linux-2026-03-08.md"
+          )
+          if ("${{ inputs.strict_collective }}" -eq "true") {
+            $args += "-StrictCollective"
+          }
+          if ("${{ inputs.strict_openclaw }}" -eq "true") {
+            $args += "-StrictOpenClaw"
+          }
+          ./scripts/validate_collective_release.ps1 @args
+
+      - name: Run collective perf baseline (in-process)
+        shell: pwsh
+        run: |
+          python tools/bench_collective_perf.py `
+            --in-process `
+            --loops 20 `
+            --fail-on-server-error `
+            --output "$env:RUNNER_TEMP/collective-perf-baseline-linux.json"
+
+      - name: Enforce collective perf budget (in-process)
+        shell: pwsh
+        run: |
+          python tools/benchmark_collective_baseline.py `
+            --loops 30 `
+            --fail-on-server-error `
+            --enforce-budget `
+            --output "$env:RUNNER_TEMP/collective-perf-budget-linux.json"
+
+      - name: Upload Linux readiness checklist
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: collective-release-readiness-linux
+          path: ${{ runner.temp }}/team-release-readiness-linux-2026-03-08.md
+          if-no-files-found: warn
+
+      - name: Upload Linux perf baseline
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: collective-perf-baseline-linux
+          path: ${{ runner.temp }}/collective-perf-baseline-linux.json
+          if-no-files-found: warn
+
+      - name: Upload Linux perf budget
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: collective-perf-budget-linux
+          path: ${{ runner.temp }}/collective-perf-budget-linux.json
+          if-no-files-found: warn
+
+  smoke-windows:
+    runs-on: windows-latest
+    needs: release-line-gate
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Python deps
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[test]"
+
+      - name: Run collective release validation (compat mode)
+        if: ${{ github.event_name != 'workflow_dispatch' }}
+        shell: pwsh
+        run: |
+          ./scripts/validate_collective_release.ps1 `
+            -StrictCollective `
+            -WriteChecklist `
+            -ChecklistPath "$env:RUNNER_TEMP/team-release-readiness-windows-2026-03-08.md"
+
+      - name: Run collective release validation (dispatch mode)
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        shell: pwsh
+        run: |
+          $args = @(
+            "-WriteChecklist",
+            "-ChecklistPath",
+            "$env:RUNNER_TEMP/team-release-readiness-windows-2026-03-08.md"
+          )
+          if ("${{ inputs.strict_collective }}" -eq "true") {
+            $args += "-StrictCollective"
+          }
+          if ("${{ inputs.strict_openclaw }}" -eq "true") {
+            $args += "-StrictOpenClaw"
+          }
+          ./scripts/validate_collective_release.ps1 @args
+
+      - name: Upload Windows readiness checklist
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: collective-release-readiness-windows
+          path: ${{ runner.temp }}/team-release-readiness-windows-2026-03-08.md
+          if-no-files-found: warn

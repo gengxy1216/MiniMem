@@ -1,0 +1,119 @@
+﻿{
+  "overall_pass": true,
+  "results": [
+    {
+      "runtime_id": "openclaw",
+      "knowledge_ids": {
+        "own_subA": "k-openclaw-ownA-efa9a505",
+        "own_subB": "k-openclaw-ownB-efa9a505",
+        "shared": "k-openclaw-shared-efa9a505"
+      },
+      "http_status": {
+        "ingest_own_subA": 200,
+        "ingest_own_subB": 200,
+        "ingest_shared": 200,
+        "context_subA": 200,
+        "context_subB": 200,
+        "feedback_shared_subA": 200,
+        "feedback_shared_subB": 200
+      },
+      "assertions": {
+        "subA_only_own_plus_shared": true,
+        "subB_only_own_plus_shared": true,
+        "both_feedback_shared_success": true
+      },
+      "context_visible": {
+        "subA": [
+          "k-openclaw-ownA-efa9a505",
+          "k-openclaw-shared-efa9a505"
+        ],
+        "subB": [
+          "k-openclaw-ownB-efa9a505",
+          "k-openclaw-shared-efa9a505"
+        ]
+      },
+      "ids": {
+        "shared_revision_id": "a20deb53701543a6b9eae5b9d5e5287f",
+        "feedback_id_subA": "30701d1759124d5f8aa3c4f59e334acb",
+        "feedback_id_subB": "136ad3e131604ee09fbe22d3d455387f"
+      },
+      "runtime_pass": true
+    },
+    {
+      "runtime_id": "codex",
+      "knowledge_ids": {
+        "own_subA": "k-codex-ownA-fc63d601",
+        "own_subB": "k-codex-ownB-fc63d601",
+        "shared": "k-codex-shared-fc63d601"
+      },
+      "http_status": {
+        "ingest_own_subA": 200,
+        "ingest_own_subB": 200,
+        "ingest_shared": 200,
+        "context_subA": 200,
+        "context_subB": 200,
+        "feedback_shared_subA": 200,
+        "feedback_shared_subB": 200
+      },
+      "assertions": {
+        "subA_only_own_plus_shared": true,
+        "subB_only_own_plus_shared": true,
+        "both_feedback_shared_success": true
+      },
+      "context_visible": {
+        "subA": [
+          "k-codex-ownA-fc63d601",
+          "k-codex-shared-fc63d601"
+        ],
+        "subB": [
+          "k-codex-ownB-fc63d601",
+          "k-codex-shared-fc63d601"
+        ]
+      },
+      "ids": {
+        "shared_revision_id": "1167d32c2bc74003ab7f78d6f6a67655",
+        "feedback_id_subA": "2d855fb5fc5b493fbbd60fd4caea945b",
+        "feedback_id_subB": "b5a52270ca7145b88851bdd1e21811a3"
+      },
+      "runtime_pass": true
+    },
+    {
+      "runtime_id": "nanobot",
+      "knowledge_ids": {
+        "own_subA": "k-nanobot-ownA-cff13c59",
+        "own_subB": "k-nanobot-ownB-cff13c59",
+        "shared": "k-nanobot-shared-cff13c59"
+      },
+      "http_status": {
+        "ingest_own_subA": 200,
+        "ingest_own_subB": 200,
+        "ingest_shared": 200,
+        "context_subA": 200,
+        "context_subB": 200,
+        "feedback_shared_subA": 200,
+        "feedback_shared_subB": 200
+      },
+      "assertions": {
+        "subA_only_own_plus_shared": true,
+        "subB_only_own_plus_shared": true,
+        "both_feedback_shared_success": true
+      },
+      "context_visible": {
+        "subA": [
+          "k-nanobot-ownA-cff13c59",
+          "k-nanobot-shared-cff13c59"
+        ],
+        "subB": [
+          "k-nanobot-ownB-cff13c59",
+          "k-nanobot-shared-cff13c59"
+        ]
+      },
+      "ids": {
+        "shared_revision_id": "cb90ac53a0be4db08ff886b3ebfc94c3",
+        "feedback_id_subA": "f2f6eef6ccf94488b6c55fe529b8bfa5",
+        "feedback_id_subB": "d7d6ce8ddeb945f4bbde92942f00c3ca"
+      },
+      "runtime_pass": true
+    }
+  ]
+}

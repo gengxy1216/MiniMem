@@ -6,6 +6,7 @@ from fastapi import FastAPI
 
 from flockmem.api.routes.config_raw import router as config_raw_router
 from flockmem.api.routes.chat import router as chat_router
+from flockmem.api.routes.collective import router as collective_router
 from flockmem.api.routes.conversation_meta import router as conversation_meta_router
 from flockmem.api.routes.health import router as health_router
 from flockmem.api.routes.graph import router as graph_router
@@ -19,6 +20,7 @@ from flockmem.config.config_json import JsonConfigRepository
 from flockmem.config.profiles import PROFILE_PRESETS
 from flockmem.config.settings import LiteSettings
 from flockmem.infra.graph.kuzu_store import KuzuGraphStore
+from flockmem.infra.sqlite.collective_repository import CollectiveRepository
 from flockmem.infra.sqlite.conversation_meta_repository import ConversationMetaRepository
 from flockmem.infra.sqlite.request_status_repository import RequestStatusRepository
 from flockmem.infra.runtime_policy.repository import RuntimePolicyRepository
@@ -30,6 +32,7 @@ from flockmem.service.embedding_factory import build_embedding_provider
 from flockmem.service.extractor_factory import build_memory_extractor
 from flockmem.service.foresight_extractor import ChatModelForesightExtractor
 from flockmem.service.formation_enhancer import ChatModelFormationEnhancer
+from flockmem.service.collective.core_loop_service import CoreLoopService
 from flockmem.service.memory_service import MemoryService
 from flockmem.service.policy_resolver import PolicyResolver
 from flockmem.service.query_rewriter import ChatModelQueryRewriter
@@ -47,6 +50,8 @@ def create_app(settings: LiteSettings) -> FastAPI:
     runtime_model_config = config_repo.get_runtime_model_config(settings)
     engine = SQLiteEngine(settings.db_path)
     init_schema(engine)
+    collective_repo = CollectiveRepository(engine)
+    core_loop_service = CoreLoopService(collective_repo)
     runtime_policy_repo = RuntimePolicyRepository(engine=engine)
     policy_resolver = PolicyResolver(runtime_policy_repo)
     request_status_repo = RequestStatusRepository(engine)
@@ -213,6 +218,8 @@ def create_app(settings: LiteSettings) -> FastAPI:
     app.state.runtime_model_config = runtime_model_config
     app.state.runtime_policy_repo = runtime_policy_repo
     app.state.policy_resolver = policy_resolver
+    app.state.collective_repository = collective_repo
+    app.state.core_loop_service = core_loop_service
     app.state.request_status_repo = request_status_repo
     app.state.conversation_meta_repo = conversation_meta_repo
     app.state.memory_service = memory_service
@@ -224,6 +231,7 @@ def create_app(settings: LiteSettings) -> FastAPI:
     app.include_router(ui_router)
     app.include_router(health_router)
     app.include_router(ingest_router)
+    app.include_router(collective_router)
     app.include_router(memory_router)
     app.include_router(config_raw_router)
     app.include_router(chat_router)

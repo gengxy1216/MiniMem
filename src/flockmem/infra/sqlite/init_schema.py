@@ -175,6 +175,95 @@ def init_schema(engine: SQLiteEngine) -> None:
         )
         """,
         """
+        CREATE TABLE IF NOT EXISTS knowledge_item (
+            knowledge_id TEXT PRIMARY KEY,
+            scope_type TEXT NOT NULL,
+            scope_id TEXT NOT NULL,
+            state TEXT NOT NULL DEFAULT 'draft',
+            canonical_revision_id TEXT,
+            read_acl TEXT NOT NULL DEFAULT '[]',
+            write_acl TEXT NOT NULL DEFAULT '[]',
+            trust_score REAL NOT NULL DEFAULT 0.5,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS knowledge_revision (
+            revision_id TEXT PRIMARY KEY,
+            knowledge_id TEXT NOT NULL,
+            parent_revision_id TEXT,
+            content_json TEXT NOT NULL,
+            confidence REAL NOT NULL DEFAULT 0.5,
+            change_type TEXT NOT NULL,
+            changed_by TEXT NOT NULL,
+            evidence_json TEXT NOT NULL DEFAULT '[]',
+            coordination_mode TEXT,
+            coordination_id TEXT,
+            runtime_id TEXT,
+            agent_id TEXT,
+            subagent_id TEXT,
+            team_id TEXT,
+            session_id TEXT,
+            created_at INTEGER NOT NULL,
+            FOREIGN KEY(knowledge_id) REFERENCES knowledge_item(knowledge_id) ON DELETE CASCADE
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS knowledge_feedback (
+            feedback_id TEXT PRIMARY KEY,
+            knowledge_id TEXT NOT NULL,
+            revision_id TEXT,
+            feedback_type TEXT NOT NULL,
+            feedback_payload TEXT NOT NULL,
+            actor TEXT NOT NULL,
+            coordination_mode TEXT,
+            coordination_id TEXT,
+            runtime_id TEXT,
+            agent_id TEXT,
+            subagent_id TEXT,
+            team_id TEXT,
+            session_id TEXT,
+            created_at INTEGER NOT NULL,
+            FOREIGN KEY(knowledge_id) REFERENCES knowledge_item(knowledge_id) ON DELETE CASCADE,
+            FOREIGN KEY(revision_id) REFERENCES knowledge_revision(revision_id) ON DELETE SET NULL
+        )
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_knowledge_item_scope
+        ON knowledge_item(scope_type, scope_id, updated_at DESC)
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_knowledge_item_scope_state
+        ON knowledge_item(scope_type, scope_id, state)
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_knowledge_item_canonical_revision
+        ON knowledge_item(canonical_revision_id)
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_knowledge_revision_knowledge
+        ON knowledge_revision(knowledge_id, created_at DESC)
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_knowledge_revision_coordination
+        ON knowledge_revision(coordination_mode, coordination_id)
+        """,
+        """
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_knowledge_revision_idempotent
+        ON knowledge_revision(knowledge_id, coordination_id, change_type, content_json)
+        WHERE coordination_id IS NOT NULL
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_knowledge_feedback_knowledge
+        ON knowledge_feedback(knowledge_id, created_at DESC)
+        """,
+        """
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_knowledge_feedback_idempotent
+        ON knowledge_feedback(knowledge_id, coordination_id, feedback_type, actor, feedback_payload)
+        WHERE coordination_id IS NOT NULL
+        """,
+        """
         CREATE INDEX IF NOT EXISTS idx_memory_memcell_memory
         ON memory_memcell(memory_id, cell_order)
         """,
@@ -228,6 +317,48 @@ def init_schema(engine: SQLiteEngine) -> None:
     engine.execute(
         "UPDATE episodic_memory SET updated_at=? WHERE updated_at IS NULL",
         (now,),
+    )
+    _ensure_column(
+        engine,
+        table="knowledge_revision",
+        column="team_id",
+        ddl="ALTER TABLE knowledge_revision ADD COLUMN team_id TEXT",
+    )
+    _ensure_column(
+        engine,
+        table="knowledge_revision",
+        column="session_id",
+        ddl="ALTER TABLE knowledge_revision ADD COLUMN session_id TEXT",
+    )
+    _ensure_column(
+        engine,
+        table="knowledge_feedback",
+        column="runtime_id",
+        ddl="ALTER TABLE knowledge_feedback ADD COLUMN runtime_id TEXT",
+    )
+    _ensure_column(
+        engine,
+        table="knowledge_feedback",
+        column="agent_id",
+        ddl="ALTER TABLE knowledge_feedback ADD COLUMN agent_id TEXT",
+    )
+    _ensure_column(
+        engine,
+        table="knowledge_feedback",
+        column="subagent_id",
+        ddl="ALTER TABLE knowledge_feedback ADD COLUMN subagent_id TEXT",
+    )
+    _ensure_column(
+        engine,
+        table="knowledge_feedback",
+        column="team_id",
+        ddl="ALTER TABLE knowledge_feedback ADD COLUMN team_id TEXT",
+    )
+    _ensure_column(
+        engine,
+        table="knowledge_feedback",
+        column="session_id",
+        ddl="ALTER TABLE knowledge_feedback ADD COLUMN session_id TEXT",
     )
     _rebuild_keyword_index_if_needed(engine)
     _rebuild_event_log_keyword_index_if_needed(engine)

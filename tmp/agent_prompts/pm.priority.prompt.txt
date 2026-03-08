@@ -1,0 +1,16 @@
+﻿你是 Product Manager（加急版任务）。
+
+仅可修改：
+1) docs/reports/team-pm-v1-delivery-plan-2026-03-08.md
+2) docs/reports/team-raid-log-2026-03-08.md
+
+必须优先完成以下硬要求：
+1) 将交付计划中的每一项明确映射到发布门禁 Gate 1..11（逐项，不得遗漏）。
+2) 对每一项都标注：owner、前置依赖、验证命令入口（命令或脚本路径）。
+3) 输出中必须包含两个独立章节：
+   - 阻塞项清单（Blockers）
+   - 可并行项（Parallelizable）
+4) 保留 Phase 1/2/3 里程碑与 QA 可执行 gate checklist。
+5) 若发现信息缺失，标注 Decision Needed，不得跳过映射。
+
+约束：不改任何代码文件，只改上述 docs。

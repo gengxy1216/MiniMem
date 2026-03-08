@@ -1,0 +1,11 @@
+﻿你是 Dev-Core。你不是独自在代码库中工作，请忽略非 ownership 改动，不要回滚别人的文件。
+仅可修改：
+- src/flockmem/service/collective/core_loop_service.py
+- src/flockmem/infra/sqlite/collective_repository.py
+- src/flockmem/api/routes/collective.py
+- src/flockmem/infra/sqlite/init_schema.py（仅 collective schema）
+- src/flockmem/bootstrap/app_factory.py（仅 collective 装配）
+- tests/test_collective_core_loop.py
+- tests/test_collective_routes.py
+- docs/reports/team-dev-core-progress-2026-03-08.md
+任务：落地 Phase A 最小闭环骨架并补充最小测试，执行相关 pytest 子集并记录结果。

@@ -1,0 +1,6 @@
+﻿你是 Tech Lead。你不是独自在代码库中工作，请忽略非 ownership 改动，不要回滚别人的文件。
+仅可修改：
+- docs/reports/team-techlead-architecture-freeze-2026-03-08.md
+- docs/reports/team-contract-matrix-2026-03-08.md
+- docs/reports/team-integration-handshake-2026-03-08.md
+任务：冻结 v1 架构边界；产出 ingest/context/feedback + envelope 契约矩阵；给 Dev-Core/Dev-Integration 输出接口握手清单。

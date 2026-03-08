@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
+import threading
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -9,12 +10,22 @@ class SQLiteEngine:
     def __init__(self, db_path: Path) -> None:
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        self._init_lock = threading.Lock()
+        self._pragmas_initialized = False
 
     def connect(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(str(self.db_path))
+        conn = sqlite3.connect(str(self.db_path), timeout=30.0)
         conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA journal_mode=WAL;")
+        # Keep read/write behavior deterministic under concurrent requests.
         conn.execute("PRAGMA foreign_keys=ON;")
+        conn.execute("PRAGMA busy_timeout=30000;")
+        if not self._pragmas_initialized:
+            with self._init_lock:
+                if not self._pragmas_initialized:
+                    conn.execute("PRAGMA journal_mode=WAL;")
+                    conn.execute("PRAGMA synchronous=NORMAL;")
+                    conn.execute("PRAGMA wal_autocheckpoint=1000;")
+                    self._pragmas_initialized = True
         return conn
 
     def execute(self, sql: str, params: Iterable[Any] = ()) -> int:

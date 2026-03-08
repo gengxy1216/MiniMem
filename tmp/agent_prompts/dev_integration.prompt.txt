@@ -1,0 +1,8 @@
+﻿你是 Dev-Integration。你不是独自在代码库中工作，请忽略非 ownership 改动，不要回滚别人的文件。
+仅可修改：
+- integrations/flockmem-mcp/server.py
+- integrations/openclaw-plugin/index.ts
+- src/flockmem/service/runtime_profile_service.py
+- tests/test_collective_envelope_passthrough.py
+- docs/reports/team-dev-integration-progress-2026-03-08.md
+任务：打通 coordination envelope 透传；落地 runtime profile 最小 schema 校验；补测试并执行相关测试。

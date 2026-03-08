@@ -102,6 +102,36 @@ class _StubFlockMemHandler(BaseHTTPRequestHandler):
         if parsed.path == "/api/v1/ingest/skill":
             self._send_json({"ok": True, "ingested": body, "accepted": True})
             return
+        if parsed.path == "/api/v1/collective/ingest":
+            self._send_json(
+                {
+                    "status": "ok",
+                    "message": "ingest accepted",
+                    "result": {
+                        "knowledge_id": body.get("knowledge_id") or "k-stub",
+                        "revision_id": "r-stub-1",
+                    },
+                }
+            )
+            return
+        if parsed.path == "/api/v1/collective/context":
+            self._send_json(
+                {
+                    "status": "ok",
+                    "message": "context resolved",
+                    "result": {"count": 1, "items": [{"knowledge_id": "k-stub"}]},
+                }
+            )
+            return
+        if parsed.path == "/api/v1/collective/feedback":
+            self._send_json(
+                {
+                    "status": "ok",
+                    "message": "feedback accepted",
+                    "result": {"knowledge_id": body.get("knowledge_id"), "feedback_id": "f-stub-1"},
+                }
+            )
+            return
         if parsed.path == "/api/v1/chat/simple":
             self._send_json(
                 {"ok": True, "answer": "stub-answer", "citations": [{"id": "slice-5"}]}
@@ -182,6 +212,9 @@ class FlockMemMCPServerTests(unittest.TestCase):
                 "chat_with_memory",
                 "write_memory",
                 "ingest_skill_output",
+                "collective_ingest",
+                "collective_context",
+                "collective_feedback",
                 "graph_search",
                 "graph_neighbors",
             }.issubset(names)
@@ -257,6 +290,84 @@ class FlockMemMCPServerTests(unittest.TestCase):
         self.assertEqual("task-1", ingested.get("task_id"))
         self.assertEqual("chan-a", ingested.get("channel"))
         self.assertEqual("group-mcp-test", ingested.get("group_id"))
+
+    def test_collective_contract_envelope_passthrough_ingest_context_feedback(self) -> None:
+        envelope = {
+            "coordination_mode": "inruntime_a2a",
+            "coordination_id": "coord-xyz-1",
+            "runtime_id": "openclaw",
+            "agent_id": "agent-root-1",
+            "subagent_id": "agent-sub-1",
+            "team_id": "team-red",
+            "session_id": "sess-88",
+        }
+
+        async def _run() -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+            async with Client(self._client_config()) as client:
+                ingest = await client.call_tool(
+                    "collective_ingest",
+                    {
+                        "knowledge_id": "k-env-1",
+                        "scope_type": "team",
+                        "scope_id": "team-red",
+                        "content": {"fact": "envelope forward"},
+                        "change_type": "create",
+                        "changed_by": "agent",
+                        "actor_id": "agent-root-1",
+                        **envelope,
+                    },
+                )
+                context = await client.call_tool(
+                    "collective_context",
+                    {
+                        "query": "need team context",
+                        "actor_id": "agent-root-1",
+                        "team_scope_id": "team-red",
+                        "top_k": 5,
+                        **envelope,
+                    },
+                )
+                feedback = await client.call_tool(
+                    "collective_feedback",
+                    {
+                        "knowledge_id": "k-env-1",
+                        "feedback_type": "execution_signal",
+                        "feedback_payload": {"outcome_status": "success"},
+                        "actor": "agent-root-1",
+                        **envelope,
+                    },
+                )
+                return _tool_payload(ingest), _tool_payload(context), _tool_payload(feedback)
+
+        ingest, context, feedback = asyncio.run(_run())
+        self.assertEqual("ok", ingest.get("status"))
+        self.assertEqual("ok", context.get("status"))
+        self.assertEqual("ok", feedback.get("status"))
+
+        events = _StubFlockMemHandler.snapshot_events()
+        post_paths = {event["path"] for event in events if event["method"] == "POST"}
+        self.assertIn("/api/v1/collective/ingest", post_paths)
+        self.assertIn("/api/v1/collective/context", post_paths)
+        self.assertIn("/api/v1/collective/feedback", post_paths)
+
+        for path in (
+            "/api/v1/collective/ingest",
+            "/api/v1/collective/context",
+            "/api/v1/collective/feedback",
+        ):
+            event = next(
+                item
+                for item in events
+                if item["method"] == "POST" and item["path"] == path
+            )
+            body = event["body"]
+            self.assertEqual(envelope["coordination_mode"], body.get("coordination_mode"))
+            self.assertEqual(envelope["coordination_id"], body.get("coordination_id"))
+            self.assertEqual(envelope["runtime_id"], body.get("runtime_id"))
+            self.assertEqual(envelope["agent_id"], body.get("agent_id"))
+            self.assertEqual(envelope["subagent_id"], body.get("subagent_id"))
+            self.assertEqual(envelope["team_id"], body.get("team_id"))
+            self.assertEqual(envelope["session_id"], body.get("session_id"))
 
 
 if __name__ == "__main__":
