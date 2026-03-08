@@ -2,7 +2,7 @@
 
 ## Supported Versions
 
-MiniMem is under active development. Please use the latest `main` branch when possible.
+FlockMem is under active development. Please use the latest `main` branch when possible.
 
 ## Reporting a Vulnerability
 
@@ -18,3 +18,4 @@ Please include:
 - Impact and attack scenario
 - Reproduction steps
 - Suggested mitigation (if any)
+

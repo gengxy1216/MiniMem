@@ -9,9 +9,9 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
-from evermemos_lite.bootstrap.app_factory import create_app
-from evermemos_lite.config.settings import LiteSettings
-from evermemos_lite.testing.writable_tempdir import WritableTempDir
+from flockmem.bootstrap.app_factory import create_app
+from flockmem.config.settings import LiteSettings
+from flockmem.testing.writable_tempdir import WritableTempDir
 
 
 class MinimalIntegrationTests(unittest.TestCase):
@@ -83,7 +83,7 @@ class MinimalIntegrationTests(unittest.TestCase):
             "message_id": "integration-msg-1",
             "create_time": int(time.time()),
             "sender": "integration-user",
-            "content": "集成测试：我今天学习了 MiniMem 的最小集成流程。",
+            "content": "集成测试：我今天学习了 FlockMem 的最小集成流程。",
             "group_id": "integration-group",
             "role": "user",
         }
@@ -103,7 +103,7 @@ class MinimalIntegrationTests(unittest.TestCase):
         search_resp = client.get(
             "/api/v1/memories/search",
             params={
-                "query": "MiniMem 集成流程",
+                "query": "FlockMem 集成流程",
                 "group_id": "integration-group",
                 "retrieve_method": "keyword",
                 "decision_mode": "static",
@@ -117,3 +117,5 @@ class MinimalIntegrationTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+

@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 from datetime import datetime, timezone
 
-from evermemos_lite.service.chat_responder import ChatResponder
+from flockmem.service.chat_responder import ChatResponder
 
 
 class StubChatResponder(ChatResponder):
@@ -103,3 +103,4 @@ class ChatResponderCitationTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

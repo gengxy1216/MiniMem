@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from evermemos_lite.config.settings import LiteSettings
+from flockmem.config.settings import LiteSettings
 
 
 class SettingsPathTests(unittest.TestCase):
@@ -59,7 +59,7 @@ class SettingsPathTests(unittest.TestCase):
             "LITE_DATA_DIR": r"C:\mem-data" if os.name == "nt" else "/tmp/mem-data",
             "LITE_CHAT_API_KEY": "k",
             "LITE_EMBEDDING_API_KEY": "k",
-            "LITE_CONFIG_DIR": r"C:\cfg\MiniMem" if os.name == "nt" else "/tmp/minimem-cfg",
+            "LITE_CONFIG_DIR": r"C:\cfg\FlockMem" if os.name == "nt" else "/tmp/minimem-cfg",
         }
         with patch.dict(os.environ, env, clear=True):
             settings = LiteSettings.from_env()
@@ -87,3 +87,5 @@ class SettingsPathTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+

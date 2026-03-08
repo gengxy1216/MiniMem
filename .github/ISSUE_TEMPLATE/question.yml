@@ -1,5 +1,5 @@
 name: Question
-description: Ask a usage or design question about MiniMem
+description: Ask a usage or design question about FlockMem
 title: "[Question] "
 labels: ["question"]
 body:
@@ -18,3 +18,4 @@ body:
       label: Context
       description: Your setup, API call, UI action, or logs.
       placeholder: Optional but helpful.
+

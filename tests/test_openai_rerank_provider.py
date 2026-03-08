@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from evermemos_lite.service.openai_rerank import OpenAIRerankProvider
+from flockmem.service.openai_rerank import OpenAIRerankProvider
 
 
 class OpenAIRerankProviderTests(unittest.TestCase):
@@ -52,3 +52,4 @@ class OpenAIRerankProviderTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

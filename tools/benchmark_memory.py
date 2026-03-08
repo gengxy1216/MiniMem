@@ -7,8 +7,8 @@ from typing import Any
 
 from fastapi.testclient import TestClient
 
-from evermemos_lite.bootstrap.app_factory import create_app
-from evermemos_lite.config.settings import LiteSettings
+from flockmem.bootstrap.app_factory import create_app
+from flockmem.config.settings import LiteSettings
 
 
 def _load_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -109,3 +109,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

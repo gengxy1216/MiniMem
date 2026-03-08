@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from evermemos_lite.api.routes.memory import (
+from flockmem.api.routes.memory import (
     _is_utf8_json_content_type,
     _normalize_memory_row,
     _validate_text_integrity,
@@ -43,3 +43,4 @@ class MemoryRoutePayloadTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

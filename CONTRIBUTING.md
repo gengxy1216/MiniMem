@@ -1,6 +1,6 @@
-# Contributing to MiniMem
+# Contributing to FlockMem
 
-Thanks for your interest in improving MiniMem.
+Thanks for your interest in improving FlockMem.
 
 ## Development Setup
 
@@ -40,3 +40,4 @@ If your PR changes user-visible behavior, add notes in `CHANGELOG.md` under `Unr
 - Prefer simple and explicit code.
 - Keep comments concise and only where needed.
 - Preserve existing API behavior unless change is intentional and documented.
+

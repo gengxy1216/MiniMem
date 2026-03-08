@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from evermemos_lite.api.routes.memory import _build_retrieve_method_patch
+from flockmem.api.routes.memory import _build_retrieve_method_patch
 
 
 class MemoryRoutePolicyTests(unittest.TestCase):
@@ -27,3 +27,4 @@ class MemoryRoutePolicyTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

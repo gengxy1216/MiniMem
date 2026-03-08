@@ -4,9 +4,9 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from evermemos_lite.infra.sqlite.db import SQLiteEngine
-from evermemos_lite.infra.sqlite.init_schema import init_schema
-from evermemos_lite.infra.sqlite.memory_repository import MemoryRepository
+from flockmem.infra.sqlite.db import SQLiteEngine
+from flockmem.infra.sqlite.init_schema import init_schema
+from flockmem.infra.sqlite.memory_repository import MemoryRepository
 
 
 class ForesightIntervalTests(unittest.TestCase):
@@ -125,3 +125,4 @@ class ForesightIntervalTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

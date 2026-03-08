@@ -965,7 +965,7 @@ function buildContextBlock(query: string, rows: Array<Record<string, any>>, topK
   if (!picked.length) {
     return "";
   }
-  const lines = ["## MiniMem Retrieved Context", `Query: ${query}`];
+  const lines = ["## FlockMem Retrieved Context", `Query: ${query}`];
   for (let i = 0; i < picked.length; i += 1) {
     const row = picked[i];
     const content = clipText(toStr(row.content), 900);
@@ -1024,15 +1024,15 @@ async function requestJson(
     });
     const raw = await response.text();
     if (!response.ok) {
-      throw new Error(`MiniMem API HTTP ${response.status}: ${clipText(raw, 320)}`);
+      throw new Error(`FlockMem API HTTP ${response.status}: ${clipText(raw, 320)}`);
     }
     try {
       return JSON.parse(raw);
     } catch (error) {
-      throw new Error(`MiniMem API returned invalid JSON: ${clipText(raw, 280)}`);
+      throw new Error(`FlockMem API returned invalid JSON: ${clipText(raw, 280)}`);
     }
   } catch (error) {
-    throw new Error(`MiniMem API request failed: ${String(error)}`);
+    throw new Error(`FlockMem API request failed: ${String(error)}`);
   } finally {
     clearTimeout(timer);
   }
@@ -1126,7 +1126,7 @@ export default function minimemOpenclawPlugin(api: any) {
   api.registerTool({
     name: "minimem_memory_write",
     description:
-      "Write memory into MiniMem. Supports dialogue, bot_profile, and context_compression.",
+      "Write memory into FlockMem. Supports dialogue, bot_profile, and context_compression.",
     parameters: {
       type: "object",
       required: ["content"],
@@ -1259,7 +1259,7 @@ export default function minimemOpenclawPlugin(api: any) {
         return { prependContext: context };
       } catch (error) {
         if (cfg.debug) {
-          console.error("[minimem-memory] auto inject failed", error);
+          console.error("[flockmem-memory] auto inject failed", error);
         }
       }
     });
@@ -1369,14 +1369,14 @@ export default function minimemOpenclawPlugin(api: any) {
         }
       } catch (error) {
         if (cfg.debug) {
-          console.error("[minimem-memory] auto capture failed", error);
+          console.error("[flockmem-memory] auto capture failed", error);
         }
       }
     });
   }
 
   return {
-    name: "MiniMem Memory Bridge",
+    name: "FlockMem Memory Bridge",
     version: "0.1.3",
   };
 }

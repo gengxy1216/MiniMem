@@ -4,7 +4,7 @@ import os
 import unittest
 from unittest.mock import patch
 
-from evermemos_lite.config.settings import LiteSettings
+from flockmem.config.settings import LiteSettings
 
 
 class SettingsRecallDefaultsTests(unittest.TestCase):
@@ -64,3 +64,4 @@ class SettingsRecallDefaultsTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

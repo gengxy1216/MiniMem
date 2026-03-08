@@ -5,12 +5,12 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from evermemos_lite.config.settings import LiteSettings
-from evermemos_lite.service.chat_model_rerank import ChatModelRerankProvider
-from evermemos_lite.service.local_rerank import LocalHeuristicRerankProvider
-from evermemos_lite.service.openai_rerank import OpenAIRerankProvider
-from evermemos_lite.service.rerank_factory import build_rerank_provider
-from evermemos_lite.testing.writable_tempdir import WritableTempDir
+from flockmem.config.settings import LiteSettings
+from flockmem.service.chat_model_rerank import ChatModelRerankProvider
+from flockmem.service.local_rerank import LocalHeuristicRerankProvider
+from flockmem.service.openai_rerank import OpenAIRerankProvider
+from flockmem.service.rerank_factory import build_rerank_provider
+from flockmem.testing.writable_tempdir import WritableTempDir
 
 
 class RerankFactoryTests(unittest.TestCase):
@@ -104,3 +104,4 @@ class RerankFactoryTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

@@ -231,7 +231,7 @@ def _first_rank(texts: list[str], marker: str) -> int | None:
     return None
 
 
-class MiniMemRunner:
+class FlockMemRunner:
     def __init__(self, repo_root: Path, embed_base_url: str, work_dir: Path, port: int) -> None:
         self.repo_root = repo_root
         self.embed_base_url = embed_base_url
@@ -284,14 +284,14 @@ class MiniMemRunner:
         deadline = time.time() + timeout_sec
         while time.time() < deadline:
             if self.proc and self.proc.poll() is not None:
-                raise RuntimeError(f"MiniMem exited early with code {self.proc.returncode}")
+                raise RuntimeError(f"FlockMem exited early with code {self.proc.returncode}")
             try:
                 with request.urlopen(f"{self.base_url}/health", timeout=1.5) as resp:
                     if resp.status == 200:
                         return
             except Exception:
                 time.sleep(0.3)
-        raise TimeoutError("MiniMem server did not become ready in time")
+        raise TimeoutError("FlockMem server did not become ready in time")
 
     def stop(self) -> None:
         if self.proc is None:
@@ -607,7 +607,7 @@ def _run_system_bench(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Benchmark MiniMem vs OSS memory baselines")
+    parser = argparse.ArgumentParser(description="Benchmark FlockMem vs OSS memory baselines")
     parser.add_argument("--doc-count", type=int, default=800, help="Number of memory items to ingest")
     parser.add_argument("--top-k", type=int, default=5, help="Top-k for retrieval")
     parser.add_argument("--concurrency", type=int, default=24, help="Search concurrency")
@@ -630,7 +630,7 @@ def main() -> None:
     embed_server.start()
 
     minimem_port = _find_free_port()
-    minimem = MiniMemRunner(repo_root=repo_root, embed_base_url=embed_server.base_url, work_dir=work_dir, port=minimem_port)
+    minimem = FlockMemRunner(repo_root=repo_root, embed_base_url=embed_server.base_url, work_dir=work_dir, port=minimem_port)
     mem0 = Mem0Runner(embed_base_url=embed_server.base_url, work_dir=work_dir, vector_dim=768)
     chroma = ChromaRunner(work_dir=work_dir, vector_dim=768)
 
@@ -643,7 +643,7 @@ def main() -> None:
         "systems": [],
         "notes": [
             "All systems run on the same machine and dataset.",
-            "MiniMem uses retrieve_method=agentic, decision_mode=rule.",
+            "FlockMem uses retrieve_method=agentic, decision_mode=rule.",
             "Mem0 runs with infer=False to isolate memory retrieval/storage performance.",
             "Embedding provider is a local deterministic OpenAI-compatible mock for fair comparison.",
         ],
@@ -653,7 +653,7 @@ def main() -> None:
         minimem.start()
         report["systems"].append(
             _run_system_bench(
-                name="MiniMem(agentic)",
+                name="FlockMem(agentic)",
                 ingest_fn=minimem.ingest,
                 search_fn=lambda qs, cc, k: minimem.search_bench(
                     queries=qs,
@@ -672,7 +672,7 @@ def main() -> None:
 
         report["systems"].append(
             _run_system_bench(
-                name="MiniMem(hybrid)",
+                name="FlockMem(hybrid)",
                 ingest_fn=lambda _: {"count": 0.0, "ok": 0.0, "error_rate": 0.0, "qps": 0.0, "latency_p50_ms": 0.0, "latency_p95_ms": 0.0, "latency_p99_ms": 0.0, "latency_mean_ms": 0.0},
                 search_fn=lambda qs, cc, k: minimem.search_bench(
                     queries=qs,
@@ -691,7 +691,7 @@ def main() -> None:
 
         report["systems"].append(
             _run_system_bench(
-                name="MiniMem(keyword)",
+                name="FlockMem(keyword)",
                 ingest_fn=lambda _: {"count": 0.0, "ok": 0.0, "error_rate": 0.0, "qps": 0.0, "latency_p50_ms": 0.0, "latency_p95_ms": 0.0, "latency_p99_ms": 0.0, "latency_mean_ms": 0.0},
                 search_fn=lambda qs, cc, k: minimem.search_bench(
                     queries=qs,
@@ -710,7 +710,7 @@ def main() -> None:
 
         report["systems"].append(
             _run_system_bench(
-                name="MiniMem(vector)",
+                name="FlockMem(vector)",
                 ingest_fn=lambda _: {"count": 0.0, "ok": 0.0, "error_rate": 0.0, "qps": 0.0, "latency_p50_ms": 0.0, "latency_p95_ms": 0.0, "latency_p99_ms": 0.0, "latency_mean_ms": 0.0},
                 search_fn=lambda qs, cc, k: minimem.search_bench(
                     queries=qs,
@@ -769,3 +769,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

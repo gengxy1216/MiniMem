@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from evermemos_lite.infra.graph.kuzu_store import KuzuGraphStore
+from flockmem.infra.graph.kuzu_store import KuzuGraphStore
 
 
 @dataclass
@@ -108,3 +108,4 @@ class GraphStorePersistenceTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

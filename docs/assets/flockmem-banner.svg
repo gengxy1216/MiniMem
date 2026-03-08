@@ -1,0 +1,62 @@
+<svg width="1600" height="420" viewBox="0 0 1600 420" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">FlockMem banner</title>
+  <desc id="desc">FlockMem wordmark with warm gradient background and minimalist geese formation mark.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#FFF2DA"/>
+      <stop offset="45%" stop-color="#FFE1CC"/>
+      <stop offset="100%" stop-color="#FFD8E7"/>
+    </linearGradient>
+    <radialGradient id="blobWarm" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#FDBA74" stop-opacity="0.78"/>
+      <stop offset="100%" stop-color="#FDBA74" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="blobMint" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#86EFAC" stop-opacity="0.56"/>
+      <stop offset="100%" stop-color="#86EFAC" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="blobRose" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#F9A8D4" stop-opacity="0.46"/>
+      <stop offset="100%" stop-color="#F9A8D4" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="coreGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#FB923C" stop-opacity="0.74"/>
+      <stop offset="100%" stop-color="#FB923C" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="wingStroke" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#111827"/>
+      <stop offset="100%" stop-color="#0F172A"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="0" y="0" width="1600" height="420" fill="url(#bg)"/>
+  <circle cx="250" cy="94" r="184" fill="url(#blobWarm)"/>
+  <circle cx="770" cy="360" r="280" fill="url(#blobRose)"/>
+  <circle cx="1435" cy="126" r="236" fill="url(#blobMint)"/>
+
+  <g transform="translate(84,76)">
+    <circle cx="128" cy="128" r="76" fill="url(#coreGlow)"/>
+    <g fill="none" stroke="url(#wingStroke)" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="116,106 128,92 140,106" stroke-width="6.2"/>
+
+      <polyline points="98,124 108,112 118,124" stroke-width="5.6"/>
+      <polyline points="138,124 148,112 158,124" stroke-width="5.6"/>
+
+      <polyline points="82,142 92,130 102,142" stroke-width="5.2"/>
+      <polyline points="154,142 164,130 174,142" stroke-width="5.2"/>
+
+      <polyline points="66,160 75,149 84,160" stroke-width="4.8"/>
+      <polyline points="172,160 181,149 190,160" stroke-width="4.8"/>
+
+      <polyline points="110,146 118,136 126,146" stroke-width="4.6" opacity="0.88"/>
+      <polyline points="130,146 138,136 146,146" stroke-width="4.6" opacity="0.88"/>
+    </g>
+  </g>
+
+  <g transform="translate(392,84)" fill="#0B1220" font-family="Segoe UI, Inter, Helvetica, Arial, sans-serif">
+    <text x="0" y="130" font-size="142" font-weight="600" letter-spacing="1.1">FlockMem</text>
+    <line x1="0" y1="176" x2="1080" y2="176" stroke="#0F172A" stroke-width="3" stroke-opacity="0.78"/>
+    <text x="0" y="254" font-size="56" font-weight="500">The Memory Infrastructure</text>
+    <text x="0" y="322" font-size="44" font-weight="500" letter-spacing="0.4">for Collaborative AI Agents</text>
+  </g>
+</svg>

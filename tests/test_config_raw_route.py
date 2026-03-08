@@ -8,9 +8,9 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
-from evermemos_lite.bootstrap.app_factory import create_app
-from evermemos_lite.config.settings import LiteSettings
-from evermemos_lite.testing.writable_tempdir import WritableTempDir
+from flockmem.bootstrap.app_factory import create_app
+from flockmem.config.settings import LiteSettings
+from flockmem.testing.writable_tempdir import WritableTempDir
 
 
 class ConfigRawRouteTests(unittest.TestCase):
@@ -142,3 +142,4 @@ class ConfigRawRouteTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

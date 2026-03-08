@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from evermemos_lite.service.openai_embedding import OpenAIEmbeddingProvider
+from flockmem.service.openai_embedding import OpenAIEmbeddingProvider
 
 
 class OpenAIEmbeddingProviderTests(unittest.TestCase):
@@ -37,3 +37,4 @@ class OpenAIEmbeddingProviderTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

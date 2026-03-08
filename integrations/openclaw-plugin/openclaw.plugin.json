@@ -1,9 +1,9 @@
 {
-  "id": "minimem-memory",
-  "name": "MiniMem Memory Bridge",
-  "version": "0.1.3",
-  "description": "Lightweight OpenClaw plugin for MiniMem memory write/retrieve and cross-session context recall.",
-  "author": "MiniMem",
+  "id": "flockmem-memory",
+  "name": "FlockMem Memory Bridge",
+  "version": "0.1.4",
+  "description": "Lightweight OpenClaw plugin for FlockMem memory write/retrieve and cross-session context recall.",
+  "author": "FlockMem",
   "kind": "memory",
   "entry": "./index.ts",
   "permissions": {
@@ -18,7 +18,7 @@
       "baseUrl": {
         "type": "string",
         "default": "http://127.0.0.1:20195",
-        "description": "MiniMem API base URL"
+        "description": "FlockMem API base URL"
       },
       "timeoutMs": {
         "type": "integer",
@@ -28,15 +28,15 @@
       },
       "bearerToken": {
         "type": "string",
-        "description": "Optional MiniMem bearer token"
+        "description": "Optional FlockMem bearer token"
       },
       "basicUser": {
         "type": "string",
-        "description": "Optional MiniMem basic auth username"
+        "description": "Optional FlockMem basic auth username"
       },
       "basicPassword": {
         "type": "string",
-        "description": "Optional MiniMem basic auth password"
+        "description": "Optional FlockMem basic auth password"
       },
       "defaultUserId": {
         "type": "string",
@@ -116,7 +116,7 @@
       "inheritPrimaryModel": {
         "type": "boolean",
         "default": true,
-        "description": "Whether OpenClaw primary model should be synced into MiniMem config.json"
+        "description": "Whether OpenClaw primary model should be synced into FlockMem config.json"
       },
       "primaryModelSnapshot": {
         "type": "object",
@@ -153,7 +153,7 @@
           "type": "string"
         },
         "default": {},
-        "description": "Map OpenClaw agent_id -> MiniMem sender"
+        "description": "Map OpenClaw agent_id -> FlockMem sender"
       },
       "channelGroupMap": {
         "type": "object",
@@ -161,7 +161,7 @@
           "type": "string"
         },
         "default": {},
-        "description": "Map OpenClaw channel -> MiniMem group_id"
+        "description": "Map OpenClaw channel -> FlockMem group_id"
       },
       "sharePolicy": {
         "type": "object",
@@ -237,3 +237,4 @@
     "icon": "database"
   }
 }
+

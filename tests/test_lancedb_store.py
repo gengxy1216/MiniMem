@@ -3,9 +3,9 @@ from __future__ import annotations
 import importlib.util
 import unittest
 from pathlib import Path
-from evermemos_lite.testing.writable_tempdir import WritableTempDir
+from flockmem.testing.writable_tempdir import WritableTempDir
 
-from evermemos_lite.infra.vector.lancedb_store import LanceVectorStore
+from flockmem.infra.vector.lancedb_store import LanceVectorStore
 
 
 class LanceVectorStorePersistenceTests(unittest.TestCase):
@@ -208,3 +208,4 @@ class LanceVectorStorePersistenceTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

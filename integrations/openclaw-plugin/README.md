@@ -1,4 +1,4 @@
-# OpenClaw MiniMem Plugin
+# OpenClaw FlockMem Plugin
 
 Lightweight memory bridge for OpenClaw.
 
@@ -13,14 +13,14 @@ It provides:
 
 Prerequisites:
 
-- MiniMem running at `http://127.0.0.1:20195` (or your custom URL)
+- FlockMem running at `http://127.0.0.1:20195` (or your custom URL)
 - OpenClaw already initialized (`~/.openclaw/openclaw.json` exists)
 
 ### Option A: Install from npm (recommended for distribution)
 
 ```bash
-openclaw plugins install openclaw-plugin-minimem
-openclaw plugins enable minimem-memory
+openclaw plugins install openclaw-flockmem
+openclaw plugins enable flockmem-memory
 ```
 
 Then set minimal config in `~/.openclaw/openclaw.json`:
@@ -28,9 +28,9 @@ Then set minimal config in `~/.openclaw/openclaw.json`:
 ```json
 {
   "plugins": {
-    "slots": { "memory": "minimem-memory" },
+    "slots": { "memory": "flockmem-memory" },
     "entries": {
-      "minimem-memory": {
+      "flockmem-memory": {
         "enabled": true,
         "config": {
           "baseUrl": "http://127.0.0.1:20195",
@@ -69,7 +69,7 @@ Default installation keeps config minimal and practical:
 - auto capture on end: on
 - auto compression capture: on
 - compression mode: `truncate` (fast/fail-open default)
-- inherit OpenClaw primary model to MiniMem `config.json`: on
+- inherit OpenClaw primary model to FlockMem `config.json`: on
 
 This means most users can start without editing config.
 
@@ -82,21 +82,21 @@ Install scripts now do an install-time sync:
    - `inheritPrimaryModel`
    - `primaryModelSnapshot`
    - `primaryModelSyncStatus`
-3. sync model trio into MiniMem `config.json` (chat/extractor follows the same model source)
+3. sync model trio into FlockMem `config.json` (chat/extractor follows the same model source)
 
 Priority rule:
 
-- explicit MiniMem `config.json` override > OpenClaw primary snapshot > default
+- explicit FlockMem `config.json` override > OpenClaw primary snapshot > default
 
 Manual override protection:
 
-- If MiniMem model fields were manually changed after previous sync, next sync is skipped (`skipped_manual_override`).
+- If FlockMem model fields were manually changed after previous sync, next sync is skipped (`skipped_manual_override`).
 - Use force sync when you intentionally want OpenClaw primary to overwrite manual values.
 
 Examples:
 
 ```powershell
-# force sync OpenClaw primary model into MiniMem config.json
+# force sync OpenClaw primary model into FlockMem config.json
 powershell -ExecutionPolicy Bypass -File integrations/openclaw-plugin/install.ps1 -ForcePrimarySync
 ```
 
@@ -106,7 +106,7 @@ bash integrations/openclaw-plugin/install.sh --disable-primary-sync
 ```
 
 ```bash
-# sync to an explicit MiniMem config.json path
+# sync to an explicit FlockMem config.json path
 bash integrations/openclaw-plugin/install.sh --minimem-config /path/to/config.json
 ```
 
@@ -274,3 +274,4 @@ You can configure without touching `openclaw.json`:
 - Requests use `application/json; charset=utf-8`
 - payload serialization is UTF-8 end-to-end
 - install scripts support Windows and Linux/macOS
+

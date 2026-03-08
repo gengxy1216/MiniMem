@@ -367,7 +367,7 @@ def convert_records(
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Convert LoCoMo-style raw data into MiniMem LoCoMo eval JSONL."
+        description="Convert LoCoMo-style raw data into FlockMem LoCoMo eval JSONL."
     )
     parser.add_argument("--input", required=True, help="Raw dataset path (.json or .jsonl)")
     parser.add_argument("--output", required=True, help="Output JSONL path")
@@ -438,3 +438,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

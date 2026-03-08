@@ -4,11 +4,11 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from evermemos_lite.domain.policy import EffectivePolicy
-from evermemos_lite.infra.sqlite.db import SQLiteEngine
-from evermemos_lite.infra.sqlite.init_schema import init_schema
-from evermemos_lite.service.formation_enhancer import BoundaryDecision
-from evermemos_lite.service.memory_service import ChatTurnInput, MemoryService
+from flockmem.domain.policy import EffectivePolicy
+from flockmem.infra.sqlite.db import SQLiteEngine
+from flockmem.infra.sqlite.init_schema import init_schema
+from flockmem.service.formation_enhancer import BoundaryDecision
+from flockmem.service.memory_service import ChatTurnInput, MemoryService
 
 
 class _NoopVectorStore:
@@ -219,3 +219,4 @@ class PhaseOneFormationTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

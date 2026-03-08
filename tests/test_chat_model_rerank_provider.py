@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from evermemos_lite.service.chat_model_rerank import ChatModelRerankProvider
+from flockmem.service.chat_model_rerank import ChatModelRerankProvider
 
 
 class ChatModelRerankProviderTests(unittest.TestCase):
@@ -39,3 +39,4 @@ class ChatModelRerankProviderTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

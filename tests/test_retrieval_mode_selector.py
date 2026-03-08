@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from evermemos_lite.service.retrieval_mode_selector import (
+from flockmem.service.retrieval_mode_selector import (
     OpenAIRetrievalModeSelector,
     RuleRetrievalModeSelector,
     SelectionInput,
@@ -45,3 +45,4 @@ class RetrievalModeSelectorTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

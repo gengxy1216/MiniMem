@@ -3,11 +3,11 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 
-from evermemos_lite.domain.policy import EffectivePolicy
-from evermemos_lite.infra.sqlite.db import SQLiteEngine
-from evermemos_lite.infra.sqlite.init_schema import init_schema
-from evermemos_lite.service.memory_service import MemoryService
-from evermemos_lite.testing.writable_tempdir import WritableTempDir
+from flockmem.domain.policy import EffectivePolicy
+from flockmem.infra.sqlite.db import SQLiteEngine
+from flockmem.infra.sqlite.init_schema import init_schema
+from flockmem.service.memory_service import MemoryService
+from flockmem.testing.writable_tempdir import WritableTempDir
 
 
 class _StubVectorStore:
@@ -173,3 +173,4 @@ class EventLogRetrievalChannelTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

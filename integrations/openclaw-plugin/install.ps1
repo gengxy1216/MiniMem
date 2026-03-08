@@ -6,7 +6,7 @@ param(
   [switch]$EnableSharedMemory,
   [switch]$DisablePrimarySync,
   [switch]$ForcePrimarySync,
-  [string]$MiniMemConfigPath = "",
+  [string]$FlockMemConfigPath = "",
   [switch]$TryRestartGateway
 )
 
@@ -47,7 +47,7 @@ $homeDir = [Environment]::GetFolderPath("UserProfile")
 $openclawDir = Join-Path $homeDir ".openclaw"
 $configPath = Join-Path $openclawDir "openclaw.json"
 $extensionsDir = Join-Path $openclawDir "extensions"
-$targetDir = Join-Path $extensionsDir "minimem-memory"
+$targetDir = Join-Path $extensionsDir "flockmem-memory"
 
 if (-not (Test-Path $configPath)) {
   throw "OpenClaw config not found: $configPath"
@@ -106,7 +106,7 @@ try:
     repo_src = repo_root / "src"
     if repo_src.exists():
         sys.path.insert(0, str(repo_src))
-    from evermemos_lite.config.openclaw_primary_sync import (
+    from flockmem.config.openclaw_primary_sync import (
         detect_primary_model_snapshot,
         sync_openclaw_primary_to_minimem_config,
         to_public_primary_snapshot,
@@ -201,7 +201,7 @@ print(json.dumps(result, ensure_ascii=False))
 '@
   $tmpPy = Join-Path ([System.IO.Path]::GetTempPath()) ("minimem_openclaw_sync_" + [Guid]::NewGuid().ToString("N") + ".py")
   $tmpErr = Join-Path ([System.IO.Path]::GetTempPath()) ("minimem_openclaw_sync_err_" + [Guid]::NewGuid().ToString("N") + ".log")
-  $miniMemArg = if ([string]::IsNullOrWhiteSpace($MiniMemConfigPath)) { "__EMPTY__" } else { $MiniMemConfigPath }
+  $miniMemArg = if ([string]::IsNullOrWhiteSpace($FlockMemConfigPath)) { "__EMPTY__" } else { $FlockMemConfigPath }
   try {
     Set-Content -Path $tmpPy -Value $syncPy -Encoding UTF8
     $syncJson = python $tmpPy $configPath $scriptDir $inheritPrimaryModel $forcePrimarySyncEnabled $miniMemArg 2> $tmpErr
@@ -232,12 +232,12 @@ $senderMap = if ($null -ne $syncResult.senderMap) { $syncResult.senderMap } else
 $channelGroupMap = if ($null -ne $syncResult.channelGroupMap) { $syncResult.channelGroupMap } else { @{} }
 $sharePolicy = if ($null -ne $syncResult.sharePolicy) { $syncResult.sharePolicy } else { @{} }
 
-$slots.memory = "minimem-memory"
+$slots.memory = "flockmem-memory"
 
-if (-not ($entries.PSObject.Properties.Name -contains "minimem-memory")) {
-  $entries | Add-Member -NotePropertyName "minimem-memory" -NotePropertyValue ([pscustomobject]@{})
+if (-not ($entries.PSObject.Properties.Name -contains "flockmem-memory")) {
+  $entries | Add-Member -NotePropertyName "flockmem-memory" -NotePropertyValue ([pscustomobject]@{})
 }
-$entry = $entries."minimem-memory"
+$entry = $entries."flockmem-memory"
 Set-ObjectProperty -Object $entry -Name "enabled" -Value $true
 Set-ObjectProperty -Object $entry -Name "config" -Value ([pscustomobject]@{
   baseUrl = $BaseUrl
@@ -262,10 +262,10 @@ Set-ObjectProperty -Object $entry -Name "config" -Value ([pscustomobject]@{
   sharePolicy = $sharePolicy
 })
 
-if (-not ($installs.PSObject.Properties.Name -contains "minimem-memory")) {
-  $installs | Add-Member -NotePropertyName "minimem-memory" -NotePropertyValue ([pscustomobject]@{})
+if (-not ($installs.PSObject.Properties.Name -contains "flockmem-memory")) {
+  $installs | Add-Member -NotePropertyName "flockmem-memory" -NotePropertyValue ([pscustomobject]@{})
 }
-$install = $installs."minimem-memory"
+$install = $installs."flockmem-memory"
 Set-ObjectProperty -Object $install -Name "source" -Value "path"
 Set-ObjectProperty -Object $install -Name "sourcePath" -Value $scriptDir
 Set-ObjectProperty -Object $install -Name "installPath" -Value $targetDir
@@ -274,7 +274,7 @@ Set-ObjectProperty -Object $install -Name "installedAt" -Value ((Get-Date).ToUni
 
 $config | ConvertTo-Json -Depth 32 | Set-Content -Path $configPath -Encoding UTF8
 
-Write-Host "MiniMem OpenClaw plugin installed."
+Write-Host "FlockMem OpenClaw plugin installed."
 Write-Host "Config: $configPath"
 Write-Host "Strategy: $GroupStrategy"
 if ($GroupStrategy -eq "shared") {
@@ -298,3 +298,5 @@ if ($TryRestartGateway) {
     Write-Host "Gateway not reachable. Start it with: openclaw gateway"
   }
 }
+
+

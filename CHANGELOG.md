@@ -28,7 +28,7 @@ The format is based on Keep a Changelog.
 - Sensitive config fields are redacted in API responses.
 - Config raw update flow preserves existing secrets when redacted placeholders are submitted.
 - Unified auth header handling across OpenAI-compatible chat/extractor/retrieval clients.
-- Wheel package now includes `evermemos_lite/ui/index.html`.
+- Wheel package now includes `flockmem/ui/index.html`.
 
 ### Changed
 
@@ -44,3 +44,4 @@ The format is based on Keep a Changelog.
 - Runtime-switchable chat and embedding providers.
 - Memory citation and retrieval trace in chat responses.
 - Basic CI (`pytest -q`) and issue/PR templates.
+

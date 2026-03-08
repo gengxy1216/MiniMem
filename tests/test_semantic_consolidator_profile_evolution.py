@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from evermemos_lite.service.semantic_consolidator import ConsolidateInput, SemanticConsolidator
+from flockmem.service.semantic_consolidator import ConsolidateInput, SemanticConsolidator
 
 
 class _StubRepo:
@@ -179,3 +179,4 @@ class SemanticConsolidatorProfileEvolutionTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

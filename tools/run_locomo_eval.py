@@ -21,8 +21,8 @@ SRC_DIR = ROOT_DIR / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-from evermemos_lite.bootstrap.app_factory import create_app
-from evermemos_lite.config.settings import LiteSettings
+from flockmem.bootstrap.app_factory import create_app
+from flockmem.config.settings import LiteSettings
 
 _DIA_ID_RE = re.compile(r"^[Dd](\d+):0*(\d+)$")
 _DIA_ID_IN_TEXT_RE = re.compile(r"[Dd]\s*:?\s*\d+\s*:\s*\d+")
@@ -72,7 +72,7 @@ def _default_eval_cache_dir(
     safe_stem = re.sub(r"[^A-Za-z0-9._-]+", "_", resolved.stem) or "dataset"
     return (
         ROOT_DIR
-        / "MiniMem_data"
+        / "FlockMem_data"
         / "benchmarks"
         / "eval_cache"
         / f"{safe_stem}.{ingest_profile}.{digest}"
@@ -207,6 +207,106 @@ def _as_str_list(value: Any) -> list[str]:
             return [x.strip() for x in text.split(",") if x.strip()]
         return [text]
     return []
+
+
+def _tokenize_eval_text(text: str) -> set[str]:
+    raw = _as_str(text).lower()
+    if not raw:
+        return set()
+    return {
+        t
+        for t in re.findall(r"[a-z0-9_]+|[\u4e00-\u9fff]{1,4}", raw)
+        if t and len(t) >= 2
+    }
+
+
+def _token_overlap_ratio(a: set[str], b: set[str]) -> float:
+    if not a or not b:
+        return 0.0
+    return float(len(a & b)) / float(max(1, len(a | b)))
+
+
+def _extract_name_like_tokens(text: str) -> set[str]:
+    raw = _as_str(text)
+    if not raw:
+        return set()
+    stop = {
+        "when",
+        "what",
+        "where",
+        "which",
+        "why",
+        "who",
+        "how",
+        "did",
+        "does",
+        "is",
+        "are",
+        "was",
+        "were",
+        "you",
+        "your",
+        "i",
+        "we",
+        "he",
+        "she",
+        "they",
+        "this",
+        "that",
+        "these",
+        "those",
+        "the",
+        "and",
+        "but",
+        "by",
+    }
+    out: set[str] = set()
+    for match in re.finditer(r"\b[A-Z][a-z]{2,}\b", raw):
+        token = match.group(0).lower()
+        if token in stop:
+            continue
+        out.add(token)
+    return out
+
+
+def _evaluate_expected_target_consistency(
+    *,
+    query: str,
+    expected_message_ids: list[str],
+    memories: list[dict[str, Any]],
+) -> tuple[bool, str, float]:
+    expected_set = {x for x in expected_message_ids if _as_str(x)}
+    if not expected_set:
+        return True, "no_expected_message_ids", 1.0
+    texts: list[str] = []
+    expected_senders: set[str] = set()
+    for item in memories:
+        if not isinstance(item, dict):
+            continue
+        msg_id = _as_str(item.get("message_id") or item.get("id"))
+        if msg_id not in expected_set:
+            continue
+        content = _as_str(item.get("content") or item.get("text"))
+        if content:
+            texts.append(content)
+        sender = _as_str(item.get("sender"))
+        if sender:
+            expected_senders.add(sender.lower())
+    if not texts:
+        return True, "expected_text_missing", 1.0
+    merged = " ".join(texts)
+    query_names = _extract_name_like_tokens(query)
+    if query_names and expected_senders:
+        if not any(name in expected_senders for name in query_names):
+            text_lower = merged.lower()
+            if not any(name in text_lower for name in query_names):
+                qnames = ",".join(sorted(query_names)[:3])
+                senders = ",".join(sorted(expected_senders)[:3])
+                return False, f"sender_name_mismatch:q={qnames};sender={senders}", 0.0
+    q_tokens = _tokenize_eval_text(query)
+    t_tokens = _tokenize_eval_text(merged)
+    overlap = _token_overlap_ratio(q_tokens, t_tokens)
+    return True, "ok", overlap
 
 
 def _normalize_message_id(value: Any) -> str:
@@ -468,14 +568,15 @@ def _evaluate_case(
     ingest_ms = (time.perf_counter() - ingest_started) * 1000.0
 
     expected_event_ids = _as_str_list(case.get("expected_event_ids"))
-    unresolved_ids: list[str] = []
-    if not expected_event_ids:
-        expected_msg_ids = _as_str_list(
+    expected_msg_ids = _as_message_id_list(
+        _as_str_list(
             case.get("expected_message_ids")
             or case.get("supporting_message_ids")
             or case.get("supporting_turn_ids")
         )
-        expected_msg_ids = _as_message_id_list(expected_msg_ids)
+    )
+    unresolved_ids: list[str] = []
+    if not expected_event_ids:
         expected_map = _lookup_event_ids_by_source_message_ids(
             db_path=db_path,
             group_id=group_id,
@@ -499,6 +600,12 @@ def _evaluate_case(
             "reason": "no_expected_targets",
             "unresolved_message_ids": unresolved_ids,
         }
+    valid_case, invalid_reason, target_overlap = _evaluate_expected_target_consistency(
+        query=query,
+        expected_message_ids=expected_msg_ids,
+        memories=memories,
+    )
+    invalid_case = not valid_case
 
     params = {
         "query": query,
@@ -537,6 +644,9 @@ def _evaluate_case(
         "group_id": group_id,
         "expected_event_ids": sorted(expected),
         "unresolved_message_ids": unresolved_ids,
+        "invalid_case": invalid_case,
+        "invalid_reason": invalid_reason if invalid_case else "",
+        "target_overlap": round(float(target_overlap), 4),
         "rank": rank,
         "hit": hit,
         "mrr_contrib": round(1.0 / rank, 8) if rank else 0.0,
@@ -639,12 +749,17 @@ def run_eval(
                 pass
 
     evaluated = [x for x in case_details if x.get("status") == "ok"]
+    evaluated_valid = [x for x in evaluated if not bool(x.get("invalid_case"))]
+    invalid = [x for x in evaluated if bool(x.get("invalid_case"))]
     skipped = [x for x in case_details if x.get("status") == "skipped"]
     failed = [x for x in case_details if x.get("status") == "failed"]
 
-    recall_hits = sum(1 for x in evaluated if bool(x.get("hit")))
-    mrr_sum = sum(float(x.get("mrr_contrib", 0.0)) for x in evaluated)
-    n = len(evaluated)
+    recall_hits_raw = sum(1 for x in evaluated if bool(x.get("hit")))
+    mrr_sum_raw = sum(float(x.get("mrr_contrib", 0.0)) for x in evaluated)
+    n_raw = len(evaluated)
+    recall_hits = sum(1 for x in evaluated_valid if bool(x.get("hit")))
+    mrr_sum = sum(float(x.get("mrr_contrib", 0.0)) for x in evaluated_valid)
+    n = len(evaluated_valid)
     ingest_ms_sum = sum(float(x.get("ingest_ms", 0.0)) for x in evaluated)
     search_ms_sum = sum(float(x.get("search_ms", 0.0)) for x in evaluated)
     case_ms_sum = sum(float(x.get("case_ms", 0.0)) for x in evaluated)
@@ -677,20 +792,24 @@ def run_eval(
         "ms_ingest_total": round(ingest_ms_sum, 3),
         "ms_search_total": round(search_ms_sum, 3),
         "ms_case_total": round(case_ms_sum, 3),
-        "ms_case_avg": round(case_ms_sum / n, 3) if n else 0.0,
+        "ms_case_avg": round(case_ms_sum / n_raw, 3) if n_raw else 0.0,
         "total_cases": len(case_details),
-        "evaluated_cases": n,
+        "evaluated_cases": n_raw,
+        "evaluated_cases_valid": n,
         "skipped_cases": len(skipped),
         "failed_cases": len(failed),
+        "invalid_cases": len(invalid),
         "recall_at_k": round(recall_hits / n, 4) if n else 0.0,
         "mrr": round(mrr_sum / n, 4) if n else 0.0,
+        "recall_at_k_raw": round(recall_hits_raw / n_raw, 4) if n_raw else 0.0,
+        "mrr_raw": round(mrr_sum_raw / n_raw, 4) if n_raw else 0.0,
         "cases": case_details,
     }
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Run end-to-end LoCoMo retrieval evaluation in local MiniMem runtime."
+        description="Run end-to-end LoCoMo retrieval evaluation in local FlockMem runtime."
     )
     parser.add_argument("--dataset", required=True, help="Prepared LoCoMo JSONL file")
     parser.add_argument("--top-k", type=int, default=8)
@@ -821,3 +940,5 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+

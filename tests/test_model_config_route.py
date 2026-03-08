@@ -8,11 +8,11 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
-from evermemos_lite.bootstrap.app_factory import create_app
-from evermemos_lite.config.settings import LiteSettings
-from evermemos_lite.infra.sqlite.app_config_repository import AppConfigRepository
-from evermemos_lite.infra.sqlite.db import SQLiteEngine
-from evermemos_lite.testing.writable_tempdir import WritableTempDir
+from flockmem.bootstrap.app_factory import create_app
+from flockmem.config.settings import LiteSettings
+from flockmem.infra.sqlite.app_config_repository import AppConfigRepository
+from flockmem.infra.sqlite.db import SQLiteEngine
+from flockmem.testing.writable_tempdir import WritableTempDir
 
 
 class ModelConfigRouteTests(unittest.TestCase):
@@ -125,3 +125,4 @@ class ModelConfigRouteTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

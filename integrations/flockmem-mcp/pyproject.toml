@@ -1,0 +1,13 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "flockmem-mcp-server"
+version = "0.1.4"
+description = "MCP bridge server for FlockMem HTTP API"
+requires-python = ">=3.11"
+dependencies = [
+  "fastmcp>=2.14.0",
+]
+

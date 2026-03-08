@@ -1,5 +1,5 @@
 name: Feature Request
-description: Propose a new feature or improvement for MiniMem
+description: Propose a new feature or improvement for FlockMem
 title: "[Feature] "
 labels: ["enhancement"]
 body:
@@ -34,3 +34,4 @@ body:
       label: Additional Context
       description: Links, references, screenshots, or prior art.
       placeholder: Optional
+

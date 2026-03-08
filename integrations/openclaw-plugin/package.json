@@ -1,18 +1,18 @@
 {
-  "name": "openclaw-plugin-minimem",
-  "version": "0.1.3",
+  "name": "openclaw-flockmem",
+  "version": "0.1.4",
   "type": "module",
   "main": "index.ts",
   "license": "MIT",
-  "author": "MiniMem",
-  "homepage": "https://github.com/gengxy1216/MiniMem/tree/main/integrations/openclaw-plugin",
+  "author": "FlockMem",
+  "homepage": "https://github.com/gengxy1216/FlockMem/tree/main/integrations/openclaw-plugin",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/gengxy1216/MiniMem.git",
+    "url": "git+https://github.com/gengxy1216/FlockMem.git",
     "directory": "integrations/openclaw-plugin"
   },
   "bugs": {
-    "url": "https://github.com/gengxy1216/MiniMem/issues"
+    "url": "https://github.com/gengxy1216/FlockMem/issues"
   },
   "openclaw": {
     "extensions": [
@@ -23,7 +23,7 @@
     "openclaw",
     "plugin",
     "memory",
-    "minimem",
+    "flockmem",
     "agent"
   ],
   "scripts": {
@@ -44,5 +44,8 @@
     "install.sh",
     "examples/AGENTS.memory-policy.md"
   ],
-  "description": "Lightweight MiniMem bridge plugin for OpenClaw gateway"
+  "description": "Lightweight FlockMem bridge plugin for OpenClaw gateway"
 }
+
+
+

@@ -8,12 +8,12 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
-from evermemos_lite.bootstrap.app_factory import create_app
-from evermemos_lite.config.settings import LiteSettings
-from evermemos_lite.service.embedding_factory import build_embedding_provider
-from evermemos_lite.service.local_embedding import LocalHashEmbeddingProvider
-from evermemos_lite.service.openai_embedding import OpenAIEmbeddingProvider
-from evermemos_lite.testing.writable_tempdir import WritableTempDir
+from flockmem.bootstrap.app_factory import create_app
+from flockmem.config.settings import LiteSettings
+from flockmem.service.embedding_factory import build_embedding_provider
+from flockmem.service.local_embedding import LocalHashEmbeddingProvider
+from flockmem.service.openai_embedding import OpenAIEmbeddingProvider
+from flockmem.testing.writable_tempdir import WritableTempDir
 
 
 class EmbeddingFactoryTests(unittest.TestCase):
@@ -101,3 +101,4 @@ class EmbeddingFactoryTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

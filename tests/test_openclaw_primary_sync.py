@@ -6,13 +6,13 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from evermemos_lite.config.openclaw_primary_sync import (
+from flockmem.config.openclaw_primary_sync import (
     _default_minimem_config_path,
     detect_primary_model_snapshot,
     sync_openclaw_primary_to_minimem_config,
     to_public_primary_snapshot,
 )
-from evermemos_lite.testing.writable_tempdir import WritableTempDir
+from flockmem.testing.writable_tempdir import WritableTempDir
 
 
 def _write_json(path: Path, payload: dict) -> None:
@@ -372,3 +372,4 @@ class OpenClawPrimarySyncTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

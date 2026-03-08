@@ -5,14 +5,14 @@ import time
 from pathlib import Path
 from typing import Any
 
-from evermemos_lite.domain.policy import EffectivePolicy
-from evermemos_lite.infra.sqlite.db import SQLiteEngine
-from evermemos_lite.infra.sqlite.init_schema import init_schema
-from evermemos_lite.infra.vector.lancedb_store import LanceVectorStore
-from evermemos_lite.service.extractor import RuleMemoryExtractor
-from evermemos_lite.service.local_embedding import LocalHashEmbeddingProvider
-from evermemos_lite.service.memory_service import MemorizeInput, MemoryService
-from evermemos_lite.testing.writable_tempdir import WritableTempDir
+from flockmem.domain.policy import EffectivePolicy
+from flockmem.infra.sqlite.db import SQLiteEngine
+from flockmem.infra.sqlite.init_schema import init_schema
+from flockmem.infra.vector.lancedb_store import LanceVectorStore
+from flockmem.service.extractor import RuleMemoryExtractor
+from flockmem.service.local_embedding import LocalHashEmbeddingProvider
+from flockmem.service.memory_service import MemorizeInput, MemoryService
+from flockmem.testing.writable_tempdir import WritableTempDir
 
 
 class _NoopGraphStore:
@@ -201,3 +201,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

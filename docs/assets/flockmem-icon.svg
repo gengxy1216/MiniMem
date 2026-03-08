@@ -1,0 +1,32 @@
+<svg width="512" height="512" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">FlockMem icon</title>
+  <desc id="desc">Minimal geese V-formation mark with a soft warm glow.</desc>
+  <defs>
+    <radialGradient id="coreGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#FB923C" stop-opacity="0.72"/>
+      <stop offset="100%" stop-color="#FB923C" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="wingStroke" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#111827"/>
+      <stop offset="100%" stop-color="#0F172A"/>
+    </linearGradient>
+  </defs>
+
+  <circle cx="128" cy="128" r="76" fill="url(#coreGlow)"/>
+
+  <g fill="none" stroke="url(#wingStroke)" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="116,106 128,92 140,106" stroke-width="6.2"/>
+
+    <polyline points="98,124 108,112 118,124" stroke-width="5.6"/>
+    <polyline points="138,124 148,112 158,124" stroke-width="5.6"/>
+
+    <polyline points="82,142 92,130 102,142" stroke-width="5.2"/>
+    <polyline points="154,142 164,130 174,142" stroke-width="5.2"/>
+
+    <polyline points="66,160 75,149 84,160" stroke-width="4.8"/>
+    <polyline points="172,160 181,149 190,160" stroke-width="4.8"/>
+
+    <polyline points="110,146 118,136 126,146" stroke-width="4.6" opacity="0.88"/>
+    <polyline points="130,146 138,136 146,146" stroke-width="4.6" opacity="0.88"/>
+  </g>
+</svg>

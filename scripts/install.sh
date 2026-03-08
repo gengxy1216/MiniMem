@@ -11,31 +11,35 @@ if command -v python3 >/dev/null 2>&1; then
 elif command -v python >/dev/null 2>&1; then
   PYTHON_BIN="python"
 else
-  echo "[MiniMem] Python not found. Please install Python 3.11+ first."
+  echo "[FlockMem] Python not found. Please install Python 3.11+ first."
   exit 1
 fi
 
 if [ ! -d ".venv" ]; then
-  echo "[MiniMem] Creating virtual environment..."
+  echo "[FlockMem] Creating virtual environment..."
   "$PYTHON_BIN" -m venv .venv
 fi
 
 VENV_PY=".venv/bin/python"
 if [ ! -f "$VENV_PY" ]; then
-  echo "[MiniMem] Virtual environment is broken: $VENV_PY not found."
+  echo "[FlockMem] Virtual environment is broken: $VENV_PY not found."
   exit 1
 fi
 
-echo "[MiniMem] Installing dependencies..."
+echo "[FlockMem] Installing dependencies..."
 "$VENV_PY" -m pip install --upgrade pip
 "$VENV_PY" -m pip install -e .
 
 echo
-echo "[MiniMem] Install completed."
-echo "Start command: .venv/bin/minimem"
+echo "[FlockMem] Install completed."
+echo "Start command: .venv/bin/flockmem"
 echo "UI URL: http://127.0.0.1:20195/ui"
 
 if [ "$RUN_AFTER_INSTALL" = "--run" ]; then
-  echo "[MiniMem] Launching..."
+  echo "[FlockMem] Launching..."
+  if [ -x ".venv/bin/flockmem" ]; then
+    exec ".venv/bin/flockmem"
+  fi
   exec ".venv/bin/minimem"
 fi
+

@@ -1,4 +1,4 @@
-# Memory Policy Template (OpenClaw + MiniMem)
+# Memory Policy Template (OpenClaw + FlockMem)
 
 Use these rules in your workspace `AGENTS.md` to keep memory behavior predictable.
 
@@ -27,4 +27,5 @@ At the end of each completed task, call `minimem_memory_write` once:
 - Shared team memory: `group_id = shared:team`
 
 Prefer per-role by default. Write to shared memory only for facts that other bots should reuse.
+
 

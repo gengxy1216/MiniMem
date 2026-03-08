@@ -43,8 +43,9 @@ jobs:
           wheel = wheels[-1]
           with zipfile.ZipFile(wheel) as zf:
               names = set(zf.namelist())
-          target = "evermemos_lite/ui/index.html"
+          target = "flockmem/ui/index.html"
           if target not in names:
               raise SystemExit(f"missing {target} in {wheel}")
           print(f"wheel ok: {wheel}")
           PY
+

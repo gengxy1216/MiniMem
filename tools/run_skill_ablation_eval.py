@@ -20,8 +20,8 @@ SRC_DIR = ROOT_DIR / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-from evermemos_lite.bootstrap.app_factory import create_app
-from evermemos_lite.config.settings import LiteSettings
+from flockmem.bootstrap.app_factory import create_app
+from flockmem.config.settings import LiteSettings
 
 
 DOCS: list[dict[str, Any]] = [
@@ -376,3 +376,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

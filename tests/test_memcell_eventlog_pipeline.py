@@ -4,12 +4,12 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from evermemos_lite.infra.sqlite.db import SQLiteEngine
-from evermemos_lite.infra.sqlite.init_schema import init_schema
-from evermemos_lite.service.event_log_extractor import RuleEventLogExtractor
-from evermemos_lite.service.extractor import ExtractedMemory
-from evermemos_lite.service.memcell_extractor import RuleMemCellExtractor
-from evermemos_lite.service.memory_service import MemorizeInput, MemoryService
+from flockmem.infra.sqlite.db import SQLiteEngine
+from flockmem.infra.sqlite.init_schema import init_schema
+from flockmem.service.event_log_extractor import RuleEventLogExtractor
+from flockmem.service.extractor import ExtractedMemory
+from flockmem.service.memcell_extractor import RuleMemCellExtractor
+from flockmem.service.memory_service import MemorizeInput, MemoryService
 
 
 class _NoopVectorStore:
@@ -195,3 +195,4 @@ class MemCellEventLogPipelineTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

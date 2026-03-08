@@ -62,7 +62,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OPENCLAW_DIR="${HOME}/.openclaw"
 CONFIG_PATH="${OPENCLAW_DIR}/openclaw.json"
 EXT_DIR="${OPENCLAW_DIR}/extensions"
-TARGET_DIR="${EXT_DIR}/minimem-memory"
+TARGET_DIR="${EXT_DIR}/flockmem-memory"
 
 if [[ ! -f "$CONFIG_PATH" ]]; then
   echo "OpenClaw config not found: $CONFIG_PATH" >&2
@@ -158,7 +158,7 @@ slots = plugins.setdefault("slots", {})
 entries = plugins.setdefault("entries", {})
 installs = plugins.setdefault("installs", {})
 
-slots["memory"] = "minimem-memory"
+slots["memory"] = "flockmem-memory"
 
 snapshot_public = {
     "provider": "",
@@ -172,7 +172,7 @@ try:
     repo_src = repo_root / "src"
     if repo_src.exists():
         sys.path.insert(0, str(repo_src))
-    from evermemos_lite.config.openclaw_primary_sync import (
+    from flockmem.config.openclaw_primary_sync import (
         detect_primary_model_snapshot,
         sync_openclaw_primary_to_minimem_config,
         to_public_primary_snapshot,
@@ -200,7 +200,7 @@ sender_map = _collect_sender_map(cfg)
 channel_group_map = _collect_channel_group_map(cfg)
 share_policy = _collect_share_policy(cfg)
 
-entry = entries.setdefault("minimem-memory", {})
+entry = entries.setdefault("flockmem-memory", {})
 entry["enabled"] = True
 entry["config"] = {
     "baseUrl": base_url,
@@ -221,7 +221,7 @@ entry["config"] = {
     "sharePolicy": share_policy,
 }
 
-install = installs.setdefault("minimem-memory", {})
+install = installs.setdefault("flockmem-memory", {})
 install["source"] = "path"
 install["sourcePath"] = source_path
 install["installPath"] = install_path
@@ -236,7 +236,7 @@ if sync_error:
     print(f"Primary model sync warning: {sync_error[:240]}", file=sys.stderr)
 PY
 
-echo "MiniMem OpenClaw plugin installed."
+echo "FlockMem OpenClaw plugin installed."
 echo "Config: $CONFIG_PATH"
 echo "Strategy: $GROUP_STRATEGY"
 if [[ "$GROUP_STRATEGY" == "shared" ]]; then
@@ -249,3 +249,5 @@ else
 fi
 
 echo "If gateway is running, restart it: openclaw gateway restart"
+
+

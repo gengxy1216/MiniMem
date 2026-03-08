@@ -22,7 +22,7 @@ function Resolve-PythonCommand {
 $PyCmd = Resolve-PythonCommand
 
 if (!(Test-Path ".venv")) {
-    Write-Host "[MiniMem] Creating virtual environment..."
+    Write-Host "[FlockMem] Creating virtual environment..."
     & $PyCmd.Cmd @($PyCmd.Args) -m venv .venv
 }
 
@@ -31,16 +31,21 @@ if (!(Test-Path $VenvPython)) {
     throw "Virtual environment is broken: $VenvPython not found."
 }
 
-Write-Host "[MiniMem] Installing dependencies..."
+Write-Host "[FlockMem] Installing dependencies..."
 & $VenvPython -m pip install --upgrade pip
 & $VenvPython -m pip install -e .
 
 Write-Host ""
-Write-Host "[MiniMem] Install completed."
-Write-Host "Start command: .venv\Scripts\minimem.exe"
+Write-Host "[FlockMem] Install completed."
+Write-Host "Start command: .venv\Scripts\flockmem.exe"
 Write-Host "UI URL: http://127.0.0.1:20195/ui"
 
 if ($RunAfterInstall) {
-    Write-Host "[MiniMem] Launching..."
-    & (Join-Path $Root ".venv\Scripts\minimem.exe")
+    Write-Host "[FlockMem] Launching..."
+    $Launcher = Join-Path $Root ".venv\Scripts\flockmem.exe"
+    if (!(Test-Path $Launcher)) {
+        $Launcher = Join-Path $Root ".venv\Scripts\minimem.exe"
+    }
+    & $Launcher
 }
+

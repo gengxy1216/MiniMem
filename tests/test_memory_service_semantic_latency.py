@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import unittest
 from pathlib import Path
-from evermemos_lite.testing.writable_tempdir import WritableTempDir
+from flockmem.testing.writable_tempdir import WritableTempDir
 
-from evermemos_lite.domain.policy import EffectivePolicy
-from evermemos_lite.infra.sqlite.db import SQLiteEngine
-from evermemos_lite.service.memory_service import MemoryService, RetrievalSufficiency
+from flockmem.domain.policy import EffectivePolicy
+from flockmem.infra.sqlite.db import SQLiteEngine
+from flockmem.service.memory_service import MemoryService, RetrievalSufficiency
 
 
 class _StubVectorStore:
@@ -562,3 +562,4 @@ class MemoryServiceSemanticLatencyTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from evermemos_lite.service.http_auth import build_auth_headers, normalize_api_key_token
+from flockmem.service.http_auth import build_auth_headers, normalize_api_key_token
 
 
 class HttpAuthHeaderTests(unittest.TestCase):
@@ -30,3 +30,4 @@ class HttpAuthHeaderTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
