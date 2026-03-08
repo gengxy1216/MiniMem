@@ -3,7 +3,7 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "minimem"
+name = "minimem-agent"
 version = "0.1.3"
 description = "Lightweight long-term memory system for local/edge AI agents"
 readme = "README.md"

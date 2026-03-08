@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from evermemos_lite.service.chat_model_rerank import ChatModelRerankProvider
 from evermemos_lite.config.settings import LiteSettings
 from evermemos_lite.service.local_rerank import LocalHeuristicRerankProvider
 from evermemos_lite.service.openai_rerank import OpenAIRerankProvider
@@ -13,7 +14,7 @@ def _norm(value: Any) -> str:
 
 def build_rerank_provider(
     *, settings: LiteSettings, runtime_model_config: dict[str, Any]
-) -> LocalHeuristicRerankProvider | OpenAIRerankProvider | None:
+) -> LocalHeuristicRerankProvider | OpenAIRerankProvider | ChatModelRerankProvider | None:
     provider = _norm(runtime_model_config.get("rerank_provider", settings.rerank_provider)).lower()
     if provider in {"none", "disabled", "rule", ""}:
         return None
@@ -28,7 +29,12 @@ def build_rerank_provider(
             max_concurrency=settings.local_rerank_max_concurrency,
         )
     if provider == "chat_model":
-        return None
+        base_url = _norm(runtime_model_config.get("rerank_base_url", settings.rerank_base_url))
+        api_key = _norm(runtime_model_config.get("rerank_api_key", settings.rerank_api_key))
+        model = _norm(runtime_model_config.get("rerank_model", settings.rerank_model))
+        if not base_url or not api_key or not model:
+            return None
+        return ChatModelRerankProvider(base_url=base_url, api_key=api_key, model=model)
     base_url = _norm(runtime_model_config.get("rerank_base_url", settings.rerank_base_url))
     api_key = _norm(runtime_model_config.get("rerank_api_key", settings.rerank_api_key))
     model = _norm(runtime_model_config.get("rerank_model", settings.rerank_model))

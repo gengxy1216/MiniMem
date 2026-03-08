@@ -93,12 +93,25 @@ class KuzuGraphStore:
         return inserted
 
     def search(
-        self, query: str, *, user_id: str | None, group_id: str | None, limit: int
+        self,
+        query: str,
+        *,
+        user_id: str | None,
+        group_id: str | None,
+        limit: int,
+        as_of_ts: int | None = None,
+        start_ts: int | None = None,
+        end_ts: int | None = None,
     ) -> list[dict[str, Any]]:
         if not self.enabled:
             return []
         q = query.strip().lower()
         q_tokens = _tokenize_text(q)
+        as_of, start, end = _normalize_time_window(
+            as_of_ts=as_of_ts,
+            start_ts=start_ts,
+            end_ts=end_ts,
+        )
         with self._lock:
             rows_snapshot = list(self._rows)
         out: list[tuple[float, dict[str, Any]]] = []
@@ -106,6 +119,16 @@ class KuzuGraphStore:
             if user_id and row.user_id != user_id:
                 continue
             if group_id and row.group_id != group_id:
+                continue
+            ts = int(row.timestamp)
+            if as_of is not None or start is not None or end is not None:
+                if ts <= 0:
+                    continue
+            if as_of is not None and ts > as_of:
+                continue
+            if start is not None and ts < start:
+                continue
+            if end is not None and ts > end:
                 continue
             text = f"{row.subject} {row.relation} {row.obj}".lower()
             text_tokens = _tokenize_text(text)
@@ -283,3 +306,22 @@ def _is_identity_query(query: str) -> bool:
         r"what(?:'s| is) my name",
     )
     return any(re.search(p, q, flags=re.IGNORECASE) for p in patterns)
+
+
+def _normalize_time_window(
+    *, as_of_ts: int | None, start_ts: int | None, end_ts: int | None
+) -> tuple[int | None, int | None, int | None]:
+    as_of = int(as_of_ts) if as_of_ts is not None else None
+    start = int(start_ts) if start_ts is not None else None
+    end = int(end_ts) if end_ts is not None else None
+    if as_of is not None and as_of <= 0:
+        as_of = None
+    if start is not None and start <= 0:
+        start = None
+    if end is not None and end <= 0:
+        end = None
+    if as_of is not None:
+        return as_of, None, None
+    if start is not None and end is not None and start > end:
+        start, end = end, start
+    return None, start, end

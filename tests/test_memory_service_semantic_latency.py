@@ -296,6 +296,50 @@ class MemoryServiceSemanticLatencyTests(unittest.TestCase):
         )
         self.assertFalse(skip)
 
+    def test_agentic_llm_sufficient_complex_query_still_runs_second_round_when_scores_not_strong(self) -> None:
+        service, _, _ = self._build_service()
+        sufficiency = RetrievalSufficiency(
+            sufficient=True,
+            source="llm_verifier",
+            confidence=0.93,
+            reason="llm_sufficient",
+        )
+        skip = service._should_skip_agentic_second_round(
+            query="When did project alpha slip, and what changed after that?",
+            hits=[
+                {"score": 0.66, "source": "keyword", "in_keyword_hits": True, "in_vector_hits": False},
+                {"score": 0.58, "source": "vector", "in_keyword_hits": False, "in_vector_hits": True},
+            ],
+            top_k=5,
+            sufficiency=sufficiency,
+        )
+        self.assertFalse(skip)
+
+    def test_agentic_llm_sufficient_complex_query_can_skip_when_dual_source_and_scores_strong(self) -> None:
+        service, _, _ = self._build_service()
+        sufficiency = RetrievalSufficiency(
+            sufficient=True,
+            source="llm_verifier",
+            confidence=0.97,
+            reason="llm_sufficient",
+        )
+        skip = service._should_skip_agentic_second_round(
+            query="When did project alpha slip, and what changed after that?",
+            hits=[
+                {"score": 0.80, "source": "hybrid_rrf", "in_keyword_hits": True, "in_vector_hits": True},
+                {"score": 0.61, "source": "vector", "in_keyword_hits": False, "in_vector_hits": True},
+                {"score": 0.54, "source": "keyword", "in_keyword_hits": True, "in_vector_hits": False},
+            ],
+            top_k=3,
+            sufficiency=sufficiency,
+        )
+        self.assertTrue(skip)
+
+    def test_expand_agentic_round_top_k_uses_deeper_candidate_budget(self) -> None:
+        service, _, _ = self._build_service()
+        self.assertEqual(24, service._expand_agentic_round_top_k(5))
+        self.assertEqual(90, service._expand_agentic_round_top_k(30))
+
     def test_basic_search_can_defer_foresight_attachment(self) -> None:
         service, _, _ = self._build_service()
         policy = EffectivePolicy(

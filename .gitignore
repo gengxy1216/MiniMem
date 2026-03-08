@@ -19,6 +19,7 @@ docs/*
 !docs/assets/**
 !docs/reference/
 !docs/reference/**
+patent/
 
 everMemOs.pdf
 tmp_paper.txt

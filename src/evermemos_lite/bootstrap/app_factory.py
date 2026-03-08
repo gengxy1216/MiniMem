@@ -28,6 +28,7 @@ from evermemos_lite.infra.vector.lancedb_store import LanceVectorStore
 from evermemos_lite.service.chat_responder import ChatResponder
 from evermemos_lite.service.embedding_factory import build_embedding_provider
 from evermemos_lite.service.extractor_factory import build_memory_extractor
+from evermemos_lite.service.foresight_extractor import ChatModelForesightExtractor
 from evermemos_lite.service.formation_enhancer import ChatModelFormationEnhancer
 from evermemos_lite.service.memory_service import MemoryService
 from evermemos_lite.service.policy_resolver import PolicyResolver
@@ -50,7 +51,11 @@ def create_app(settings: LiteSettings) -> FastAPI:
     policy_resolver = PolicyResolver(runtime_policy_repo)
     request_status_repo = RequestStatusRepository(engine)
     conversation_meta_repo = ConversationMetaRepository(engine)
-    profile = PROFILE_PRESETS.get(settings.retrieval_profile, PROFILE_PRESETS["agentic"])
+    profile_name = str(settings.retrieval_profile or "").strip().lower()
+    if settings.recall_mode and profile_name in {"", "agentic", "balanced", "hybrid"}:
+        profile_name = "recall"
+    fallback_profile = "recall" if settings.recall_mode else "agentic"
+    profile = PROFILE_PRESETS.get(profile_name, PROFILE_PRESETS[fallback_profile])
     embedding_provider = build_embedding_provider(
         settings=settings, runtime_model_config=runtime_model_config
     )
@@ -96,12 +101,30 @@ def create_app(settings: LiteSettings) -> FastAPI:
         model=phase1_model,
         enabled=settings.phase3_query_rewriter_enabled,
     )
+    foresight_extractor = ChatModelForesightExtractor(
+        base_url=phase1_base_url,
+        api_key=phase1_api_key,
+        model=phase1_model,
+    )
     rerank_provider = build_rerank_provider(
         settings=settings, runtime_model_config=runtime_model_config
     )
 
     vector_store = LanceVectorStore(
         settings.lancedb_dir,
+        vector_dim=max(8, profile.vector_dim or 384),
+        use_lancedb=settings.vector_lancedb_enabled,
+        lance_persist_min_importance=settings.vector_lancedb_min_importance,
+        index_type=settings.vector_index_type,
+        index_metric=settings.vector_index_metric,
+        hnsw_m=settings.vector_index_m,
+        hnsw_ef_construction=settings.vector_index_ef_construction,
+        search_nprobes=settings.vector_search_nprobes,
+        search_ef=settings.vector_search_ef,
+        search_refine_factor=settings.vector_search_refine_factor,
+    )
+    event_log_vector_store = LanceVectorStore(
+        settings.lancedb_dir / "eventlog",
         vector_dim=max(8, profile.vector_dim or 384),
         use_lancedb=settings.vector_lancedb_enabled,
         lance_persist_min_importance=settings.vector_lancedb_min_importance,
@@ -149,6 +172,13 @@ def create_app(settings: LiteSettings) -> FastAPI:
         query_embed_cache_ttl_sec=settings.query_embed_cache_ttl_sec,
         search_trace_enabled=settings.search_trace_enabled,
         search_trace_slow_ms=settings.search_trace_slow_ms,
+        event_log_vector_store=event_log_vector_store,
+        foresight_extractor=foresight_extractor,
+        extract_max_retries=settings.extract_max_retries,
+        recall_mode=settings.recall_mode,
+        agentic_round_min_k=settings.agentic_round_min_k,
+        agentic_round_max_k=settings.agentic_round_max_k,
+        agentic_force_second_round=settings.agentic_force_second_round,
     )
     chat_responder = ChatResponder(
         base_url=runtime_model_config["chat_base_url"],

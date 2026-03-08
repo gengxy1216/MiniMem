@@ -20,6 +20,17 @@ class LanceVectorStorePersistenceTests(unittest.TestCase):
             )
             self.assertEqual("IVF_HNSW_PQ", store._index_type)
 
+    def test_hnsw_alias_maps_to_supported_index_type(self) -> None:
+        with WritableTempDir() as tmp:
+            base = Path(tmp)
+            store = LanceVectorStore(
+                base,
+                vector_dim=4,
+                use_lancedb=False,
+                index_type="HNSW",
+            )
+            self.assertEqual("IVF_HNSW_PQ", store._index_type)
+
     def test_local_upsert_is_persisted_and_restored_after_restart(self) -> None:
         with WritableTempDir() as tmp:
             base = Path(tmp)
@@ -65,6 +76,42 @@ class LanceVectorStorePersistenceTests(unittest.TestCase):
                 candidate_episode_ids={"mem-1"},
             )
             self.assertEqual(["mem-1"], [x["memory_id"] for x in hits])
+
+    def test_search_respects_time_window_filters(self) -> None:
+        with WritableTempDir() as tmp:
+            base = Path(tmp)
+            store = LanceVectorStore(base, vector_dim=4, use_lancedb=False)
+            store.upsert(
+                "row-2023",
+                "mem-2023",
+                [1.0, 0.0, 0.0, 0.0],
+                {
+                    "user_id": "u1",
+                    "group_id": "g1",
+                    "timestamp": 1686758400,
+                    "importance_score": 0.3,
+                },
+            )
+            store.upsert(
+                "row-2025",
+                "mem-2025",
+                [0.95, 0.0, 0.0, 0.0],
+                {
+                    "user_id": "u1",
+                    "group_id": "g1",
+                    "timestamp": 1736611200,
+                    "importance_score": 0.3,
+                },
+            )
+            hits = store.search(
+                vector=[1.0, 0.0, 0.0, 0.0],
+                top_k=5,
+                user_id="u1",
+                group_id="g1",
+                start_ts=1672531200,
+                end_ts=1704067199,
+            )
+            self.assertEqual(["mem-2023"], [x["memory_id"] for x in hits])
 
     def test_restore_ignores_corrupted_log_lines(self) -> None:
         with WritableTempDir() as tmp:

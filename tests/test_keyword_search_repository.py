@@ -276,6 +276,249 @@ class KeywordSearchRepositoryTests(unittest.TestCase):
             ids = [str(x.get("memory_id", "")) for x in hits]
             self.assertIn(str(task_row["id"]), ids)
 
+    def test_keyword_search_respects_time_window(self) -> None:
+        with WritableTempDir(ignore_cleanup_errors=True) as tmp:
+            repo = self._build_repo(tmp)
+            m2023 = repo.save_message_as_memory(
+                message_id="m-kw-2023",
+                create_time=1686758400,
+                sender="u1",
+                content="alpha milestone record",
+                user_id="u1",
+                group_id="g1",
+                group_name=None,
+                sender_name="u1",
+                role="user",
+                importance_score=0.7,
+                storage_tier="text_only",
+                summary="alpha",
+                subject="project",
+                atomic_facts=[],
+                foresights=[],
+                profile_patch={},
+            )
+            repo.save_message_as_memory(
+                message_id="m-kw-2025",
+                create_time=1736611200,
+                sender="u1",
+                content="alpha milestone record",
+                user_id="u1",
+                group_id="g1",
+                group_name=None,
+                sender_name="u1",
+                role="user",
+                importance_score=0.7,
+                storage_tier="text_only",
+                summary="alpha",
+                subject="project",
+                atomic_facts=[],
+                foresights=[],
+                profile_patch={},
+            )
+            hits = repo.search_keyword(
+                query="alpha milestone",
+                user_id="u1",
+                group_id="g1",
+                top_k=5,
+                start_ts=1672531200,
+                end_ts=1704067199,
+            )
+            ids = [str(x.get("memory_id", "")) for x in hits]
+            self.assertEqual([str(m2023["id"])], ids)
+
+    def test_get_episode_ids_by_event_ids_filters_hits_and_misses(self) -> None:
+        with WritableTempDir(ignore_cleanup_errors=True) as tmp:
+            repo = self._build_repo(tmp)
+            hit_recent = repo.save_message_as_memory(
+                message_id="m-evt-hit-recent",
+                create_time=1735689600,
+                sender="u1",
+                content="hit recent",
+                user_id="u1",
+                group_id="g1",
+                group_name=None,
+                sender_name="u1",
+                role="user",
+                importance_score=0.7,
+                storage_tier="graph_text",
+                summary="hit recent",
+                subject="evt",
+                atomic_facts=[],
+                foresights=[],
+                profile_patch={},
+                event_id="evt-hit-recent",
+            )
+            hit_old = repo.save_message_as_memory(
+                message_id="m-evt-hit-old",
+                create_time=1672531200,
+                sender="u1",
+                content="hit old",
+                user_id="u1",
+                group_id="g1",
+                group_name=None,
+                sender_name="u1",
+                role="user",
+                importance_score=0.7,
+                storage_tier="graph_text",
+                summary="hit old",
+                subject="evt",
+                atomic_facts=[],
+                foresights=[],
+                profile_patch={},
+                event_id="evt-hit-old",
+            )
+            repo.save_message_as_memory(
+                message_id="m-evt-miss-group",
+                create_time=1735689601,
+                sender="u1",
+                content="miss group",
+                user_id="u1",
+                group_id="g2",
+                group_name=None,
+                sender_name="u1",
+                role="user",
+                importance_score=0.7,
+                storage_tier="graph_text",
+                summary="miss group",
+                subject="evt",
+                atomic_facts=[],
+                foresights=[],
+                profile_patch={},
+                event_id="evt-miss-group",
+            )
+            repo.save_message_as_memory(
+                message_id="m-evt-miss-user",
+                create_time=1735689602,
+                sender="u2",
+                content="miss user",
+                user_id="u2",
+                group_id="g1",
+                group_name=None,
+                sender_name="u2",
+                role="user",
+                importance_score=0.7,
+                storage_tier="graph_text",
+                summary="miss user",
+                subject="evt",
+                atomic_facts=[],
+                foresights=[],
+                profile_patch={},
+                event_id="evt-miss-user",
+            )
+            sample_events = [
+                "evt-hit-recent",
+                "evt-hit-old",
+                "evt-miss-group",
+                "evt-miss-user",
+                "evt-not-exists",
+                "",
+                "evt-hit-recent",
+            ]
+
+            only_recent = repo.get_episode_ids_by_event_ids(
+                event_ids=sample_events,
+                user_id="u1",
+                group_id="g1",
+                start_ts=1704067200,
+                end_ts=1767225599,
+                limit=20,
+            )
+            self.assertEqual([str(hit_recent["id"])], only_recent)
+
+            with_history = repo.get_episode_ids_by_event_ids(
+                event_ids=sample_events,
+                user_id="u1",
+                group_id="g1",
+                limit=20,
+            )
+            self.assertEqual(
+                {str(hit_recent["id"]), str(hit_old["id"])},
+                set(with_history),
+            )
+
+    def test_event_log_keyword_search_hits_memory_by_atomic_fact(self) -> None:
+        with WritableTempDir(ignore_cleanup_errors=True) as tmp:
+            repo = self._build_repo(tmp)
+            row = repo.save_message_as_memory(
+                message_id="m-el-1",
+                create_time=1700000600,
+                sender="u1",
+                content="weekly update without detailed owner names",
+                user_id="u1",
+                group_id="g1",
+                group_name=None,
+                sender_name="u1",
+                role="user",
+                importance_score=0.8,
+                storage_tier="vector_only",
+                summary="weekly update",
+                subject="ops",
+                atomic_facts=["approval owner is nora", "deadline moved to friday"],
+                foresights=[],
+                profile_patch={},
+                event_id="evt-el-1",
+            )
+            memory_id = str(row["id"])
+            inserted = repo.save_event_logs(
+                memory_id=memory_id,
+                event_id="evt-el-1",
+                user_id="u1",
+                group_id="g1",
+                event_logs=[
+                    {"fact_order": 1, "fact": "approval owner is nora", "fact_norm": "approvalownerisnora"},
+                    {"fact_order": 2, "fact": "deadline moved to friday", "fact_norm": "deadlinemovedtofriday"},
+                ],
+                created_at=1700000600,
+            )
+            self.assertEqual(2, inserted)
+            hits = repo.search_event_log_keyword(
+                query="who is nora",
+                user_id="u1",
+                group_id="g1",
+                top_k=5,
+            )
+            ids = [str(x.get("memory_id", "")) for x in hits]
+            self.assertIn(memory_id, ids)
+
+    def test_foresight_keyword_search_hits_memory_by_foresight_content(self) -> None:
+        with WritableTempDir(ignore_cleanup_errors=True) as tmp:
+            repo = self._build_repo(tmp)
+            row = repo.save_message_as_memory(
+                message_id="m-fs-1",
+                create_time=1700000602,
+                sender="u1",
+                content="planning weekly schedule",
+                user_id="u1",
+                group_id="g1",
+                group_name=None,
+                sender_name="u1",
+                role="user",
+                importance_score=0.8,
+                storage_tier="vector_only",
+                summary="planning",
+                subject="ops",
+                atomic_facts=["weekly planning"],
+                foresights=[
+                    {
+                        "content": "next friday finalize payroll checklist",
+                        "start_time": 1700600000,
+                        "end_time": 1700686400,
+                        "confidence": 0.71,
+                    }
+                ],
+                profile_patch={},
+                event_id="evt-fs-1",
+            )
+            memory_id = str(row["id"])
+            hits = repo.search_foresight_keyword(
+                query="finalize payroll checklist friday",
+                user_id="u1",
+                group_id="g1",
+                top_k=5,
+            )
+            ids = [str(x.get("memory_id", "")) for x in hits]
+            self.assertIn(memory_id, ids)
+
     def test_list_groups_returns_desc_by_latest_timestamp(self) -> None:
         with WritableTempDir(ignore_cleanup_errors=True) as tmp:
             repo = self._build_repo(tmp)

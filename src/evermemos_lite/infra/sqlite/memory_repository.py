@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+import sqlite3
 import time
 import uuid
 from collections import defaultdict
@@ -106,6 +107,7 @@ class MemoryRepository:
             memory_category=category,
             storage_tier=tier,
         )
+        self._sync_foresight_keyword_index(memory_id=mid)
         if profile_patch:
             self.upsert_profile_snapshot(
                 event_id=eid,
@@ -130,6 +132,120 @@ class MemoryRepository:
             "memory_category": category,
         }
 
+    def save_memcells(
+        self,
+        *,
+        memory_id: str,
+        event_id: str,
+        user_id: str,
+        group_id: str | None,
+        memcells: list[str],
+        created_at: int,
+    ) -> int:
+        rows: list[tuple[Any, ...]] = []
+        for idx, item in enumerate(list(memcells or []), start=1):
+            content = " ".join(str(item or "").split()).strip()
+            if not content:
+                continue
+            rows.append(
+                (
+                    memory_id,
+                    event_id,
+                    user_id,
+                    group_id,
+                    int(idx),
+                    content[:2000],
+                    int(created_at),
+                )
+            )
+            if len(rows) >= 48:
+                break
+        if not rows:
+            return 0
+        self.engine.executemany(
+            """
+            INSERT INTO memory_memcell(
+              memory_id,event_id,user_id,group_id,cell_order,content,created_at
+            ) VALUES(?,?,?,?,?,?,?)
+            """,
+            rows,
+        )
+        return len(rows)
+
+    def save_event_logs(
+        self,
+        *,
+        memory_id: str,
+        event_id: str,
+        user_id: str,
+        group_id: str | None,
+        event_logs: list[dict[str, Any]],
+        created_at: int,
+    ) -> int:
+        rows: list[tuple[Any, ...]] = []
+        seen: set[str] = set()
+        for idx, item in enumerate(list(event_logs or []), start=1):
+            if not isinstance(item, dict):
+                continue
+            fact = " ".join(str(item.get("fact", "")).split()).strip()
+            fact_norm = str(item.get("fact_norm", "")).strip().lower()
+            if not fact:
+                continue
+            if not fact_norm:
+                fact_norm = re.sub(r"[\s\W_]+", "", fact.lower(), flags=re.UNICODE)
+            if not fact_norm or fact_norm in seen:
+                continue
+            seen.add(fact_norm)
+            fact_order = int(item.get("fact_order", idx) or idx)
+            rows.append(
+                (
+                    memory_id,
+                    event_id,
+                    user_id,
+                    group_id,
+                    fact_order,
+                    fact[:240],
+                    fact_norm[:128],
+                    int(created_at),
+                )
+            )
+            if len(rows) >= 64:
+                break
+        if not rows:
+            return 0
+        self.engine.executemany(
+            """
+            INSERT INTO memory_event_log(
+              memory_id,event_id,user_id,group_id,fact_order,fact,fact_norm,created_at
+            ) VALUES(?,?,?,?,?,?,?,?)
+            """,
+            rows,
+        )
+        self._sync_event_log_keyword_index(memory_id=memory_id)
+        return len(rows)
+
+    def get_memcells_by_memory_id(self, memory_id: str) -> list[dict[str, Any]]:
+        return self.engine.query_all(
+            """
+            SELECT memory_id,event_id,user_id,group_id,cell_order,content,created_at
+            FROM memory_memcell
+            WHERE memory_id=?
+            ORDER BY cell_order ASC
+            """,
+            (str(memory_id or "").strip(),),
+        )
+
+    def get_event_logs_by_memory_id(self, memory_id: str) -> list[dict[str, Any]]:
+        return self.engine.query_all(
+            """
+            SELECT memory_id,event_id,user_id,group_id,fact_order,fact,fact_norm,created_at
+            FROM memory_event_log
+            WHERE memory_id=?
+            ORDER BY fact_order ASC, id ASC
+            """,
+            (str(memory_id or "").strip(),),
+        )
+
     def fetch_episodes(
         self,
         *,
@@ -137,6 +253,9 @@ class MemoryRepository:
         group_id: str | None,
         limit: int = 40,
         candidate_episode_ids: set[str] | None = None,
+        as_of_ts: int | None = None,
+        start_ts: int | None = None,
+        end_ts: int | None = None,
     ) -> list[dict[str, Any]]:
         sql = """
             SELECT
@@ -175,6 +294,23 @@ class MemoryRepository:
             placeholders = ",".join("?" for _ in candidate_episode_ids)
             sql += f" AND m.id IN ({placeholders})"
             params.extend(list(candidate_episode_ids))
+        as_of, start, end = self._normalize_time_window(
+            as_of_ts=as_of_ts,
+            start_ts=start_ts,
+            end_ts=end_ts,
+        )
+        if as_of is not None or start is not None or end is not None:
+            sql += " AND m.timestamp>0"
+        if as_of is not None:
+            sql += " AND m.timestamp<=?"
+            params.append(as_of)
+        else:
+            if start is not None:
+                sql += " AND m.timestamp>=?"
+                params.append(start)
+            if end is not None:
+                sql += " AND m.timestamp<=?"
+                params.append(end)
         sql += " ORDER BY m.timestamp DESC LIMIT ?"
         params.append(max(1, int(limit)))
         return self.engine.query_all(sql, params)
@@ -210,6 +346,68 @@ class MemoryRepository:
         rows.sort(key=lambda x: order.get(str(x.get("id")), 1_000_000))
         return rows
 
+    def get_episode_ids_by_event_ids(
+        self,
+        *,
+        event_ids: list[str],
+        user_id: str | None,
+        group_id: str | None,
+        limit: int = 500,
+        as_of_ts: int | None = None,
+        start_ts: int | None = None,
+        end_ts: int | None = None,
+    ) -> list[str]:
+        normalized_event_ids = [
+            x for x in dict.fromkeys(str(v).strip() for v in event_ids) if x
+        ]
+        if not normalized_event_ids:
+            return []
+        placeholders = ",".join("?" for _ in normalized_event_ids)
+        sql = f"""
+            SELECT id,event_id,timestamp
+            FROM episodic_memory
+            WHERE is_deleted=0
+              AND event_id IN ({placeholders})
+        """
+        params: list[Any] = list(normalized_event_ids)
+        if user_id:
+            sql += " AND user_id=?"
+            params.append(user_id)
+        if group_id:
+            sql += " AND group_id=?"
+            params.append(group_id)
+        as_of, start, end = self._normalize_time_window(
+            as_of_ts=as_of_ts,
+            start_ts=start_ts,
+            end_ts=end_ts,
+        )
+        if as_of is not None or start is not None or end is not None:
+            sql += " AND timestamp>0"
+        if as_of is not None:
+            sql += " AND timestamp<=?"
+            params.append(as_of)
+        else:
+            if start is not None:
+                sql += " AND timestamp>=?"
+                params.append(start)
+            if end is not None:
+                sql += " AND timestamp<=?"
+                params.append(end)
+        sql += " LIMIT ?"
+        params.append(max(1, int(limit)))
+        rows = self.engine.query_all(sql, params)
+        order = {
+            event_id: idx for idx, event_id in enumerate(normalized_event_ids, start=1)
+        }
+        rows.sort(
+            key=lambda row: (
+                order.get(str(row.get("event_id", "")), 1_000_000),
+                -int(row.get("timestamp", 0) or 0),
+            )
+        )
+        episode_ids = [str(row.get("id", "")).strip() for row in rows]
+        return [x for x in dict.fromkeys(episode_ids) if x]
+
     def list_groups(self, *, user_id: str | None, limit: int = 100) -> list[dict[str, Any]]:
         sql = """
             SELECT
@@ -236,6 +434,9 @@ class MemoryRepository:
         group_id: str | None,
         top_k: int,
         candidate_episode_ids: set[str] | None = None,
+        as_of_ts: int | None = None,
+        start_ts: int | None = None,
+        end_ts: int | None = None,
     ) -> list[dict[str, Any]]:
         fts_hits = self._search_keyword_fts(
             query=query,
@@ -243,15 +444,111 @@ class MemoryRepository:
             group_id=group_id,
             top_k=top_k,
             candidate_episode_ids=candidate_episode_ids,
+            as_of_ts=as_of_ts,
+            start_ts=start_ts,
+            end_ts=end_ts,
         )
-        if fts_hits:
-            return fts_hits
-        return self._search_keyword_scan(
+        try:
+            scan_hits = self._search_keyword_scan(
+                query=query,
+                user_id=user_id,
+                group_id=group_id,
+                top_k=max(top_k, int(top_k) * 3),
+                candidate_episode_ids=candidate_episode_ids,
+                as_of_ts=as_of_ts,
+                start_ts=start_ts,
+                end_ts=end_ts,
+            )
+        except sqlite3.OperationalError as exc:
+            if "no such table: memory_fact" not in str(exc).lower():
+                raise
+            scan_hits = []
+        return self._merge_ranked_hit_lists(
+            primary=fts_hits,
+            secondary=scan_hits,
+            top_k=top_k,
+            primary_name="keyword_fts",
+            secondary_name="keyword_scan",
+        )
+
+    def search_event_log_keyword(
+        self,
+        *,
+        query: str,
+        user_id: str | None,
+        group_id: str | None,
+        top_k: int,
+        candidate_episode_ids: set[str] | None = None,
+        as_of_ts: int | None = None,
+        start_ts: int | None = None,
+        end_ts: int | None = None,
+    ) -> list[dict[str, Any]]:
+        fts_hits = self._search_event_log_keyword_fts(
             query=query,
             user_id=user_id,
             group_id=group_id,
             top_k=top_k,
             candidate_episode_ids=candidate_episode_ids,
+            as_of_ts=as_of_ts,
+            start_ts=start_ts,
+            end_ts=end_ts,
+        )
+        scan_hits = self._search_event_log_keyword_scan(
+            query=query,
+            user_id=user_id,
+            group_id=group_id,
+            top_k=max(top_k, int(top_k) * 3),
+            candidate_episode_ids=candidate_episode_ids,
+            as_of_ts=as_of_ts,
+            start_ts=start_ts,
+            end_ts=end_ts,
+        )
+        return self._merge_ranked_hit_lists(
+            primary=fts_hits,
+            secondary=scan_hits,
+            top_k=top_k,
+            primary_name="event_log_keyword_fts",
+            secondary_name="event_log_keyword_scan",
+        )
+
+    def search_foresight_keyword(
+        self,
+        *,
+        query: str,
+        user_id: str | None,
+        group_id: str | None,
+        top_k: int,
+        candidate_episode_ids: set[str] | None = None,
+        as_of_ts: int | None = None,
+        start_ts: int | None = None,
+        end_ts: int | None = None,
+    ) -> list[dict[str, Any]]:
+        fts_hits = self._search_foresight_keyword_fts(
+            query=query,
+            user_id=user_id,
+            group_id=group_id,
+            top_k=top_k,
+            candidate_episode_ids=candidate_episode_ids,
+            as_of_ts=as_of_ts,
+            start_ts=start_ts,
+            end_ts=end_ts,
+        )
+        scan_hits = self._search_foresight_keyword_scan(
+            query=query,
+            user_id=user_id,
+            group_id=group_id,
+            top_k=max(top_k, int(top_k) * 3),
+            candidate_episode_ids=candidate_episode_ids,
+            as_of_ts=as_of_ts,
+            start_ts=start_ts,
+            end_ts=end_ts,
+        )
+        return self._merge_ranked_hit_lists(
+            primary=fts_hits,
+            secondary=scan_hits,
+            top_k=top_k,
+            primary_name="foresight_keyword_fts",
+            secondary_name="foresight_keyword_scan",
         )
 
     def _search_keyword_scan(
@@ -262,12 +559,18 @@ class MemoryRepository:
         group_id: str | None,
         top_k: int,
         candidate_episode_ids: set[str] | None = None,
+        as_of_ts: int | None = None,
+        start_ts: int | None = None,
+        end_ts: int | None = None,
     ) -> list[dict[str, Any]]:
         rows = self.fetch_episodes(
             user_id=user_id,
             group_id=group_id,
             limit=max(800, top_k * 40),
             candidate_episode_ids=candidate_episode_ids,
+            as_of_ts=as_of_ts,
+            start_ts=start_ts,
+            end_ts=end_ts,
         )
         terms = self._tokenize_text(query)
         if not terms:
@@ -317,6 +620,9 @@ class MemoryRepository:
         group_id: str | None,
         top_k: int,
         candidate_episode_ids: set[str] | None = None,
+        as_of_ts: int | None = None,
+        start_ts: int | None = None,
+        end_ts: int | None = None,
     ) -> list[dict[str, Any]]:
         terms = self._tokenize_text(query)
         if not terms:
@@ -360,6 +666,23 @@ class MemoryRepository:
             placeholders = ",".join("?" for _ in candidate_episode_ids)
             sql += f" AND m.id IN ({placeholders})"
             params.extend(list(candidate_episode_ids))
+        as_of, start, end = self._normalize_time_window(
+            as_of_ts=as_of_ts,
+            start_ts=start_ts,
+            end_ts=end_ts,
+        )
+        if as_of is not None or start is not None or end is not None:
+            sql += " AND m.timestamp>0"
+        if as_of is not None:
+            sql += " AND m.timestamp<=?"
+            params.append(as_of)
+        else:
+            if start is not None:
+                sql += " AND m.timestamp>=?"
+                params.append(start)
+            if end is not None:
+                sql += " AND m.timestamp<=?"
+                params.append(end)
         sql += " ORDER BY bm25(memory_keyword_fts) ASC, m.timestamp DESC LIMIT ?"
         params.append(max(100, int(top_k) * 16))
         try:
@@ -413,6 +736,562 @@ class MemoryRepository:
         )
         return scored[: max(1, int(top_k))]
 
+    def _search_event_log_keyword_fts(
+        self,
+        *,
+        query: str,
+        user_id: str | None,
+        group_id: str | None,
+        top_k: int,
+        candidate_episode_ids: set[str] | None = None,
+        as_of_ts: int | None = None,
+        start_ts: int | None = None,
+        end_ts: int | None = None,
+    ) -> list[dict[str, Any]]:
+        terms = self._tokenize_text(query)
+        if not terms:
+            terms = [query.lower()]
+        dedup_terms = list(dict.fromkeys(t for t in terms if t.strip()))
+        if not dedup_terms:
+            return []
+        selected = dedup_terms[:24]
+        core_terms = list(selected)
+        match_query = " OR ".join(f'"{self._escape_fts_term(t)}"' for t in selected)
+        sql = """
+            SELECT
+              idx.memory_id AS memory_id,
+              idx.fact_text AS fact_text,
+              bm25(event_log_keyword_fts) AS bm25_score
+            FROM event_log_keyword_fts idx
+            JOIN episodic_memory m ON m.id = idx.memory_id
+            WHERE event_log_keyword_fts MATCH ?
+              AND m.is_deleted=0
+        """
+        params: list[Any] = [match_query]
+        if user_id:
+            sql += " AND m.user_id=?"
+            params.append(user_id)
+        if group_id:
+            sql += " AND m.group_id=?"
+            params.append(group_id)
+        if candidate_episode_ids is not None:
+            if not candidate_episode_ids:
+                return []
+            placeholders = ",".join("?" for _ in candidate_episode_ids)
+            sql += f" AND m.id IN ({placeholders})"
+            params.extend(list(candidate_episode_ids))
+        as_of, start, end = self._normalize_time_window(
+            as_of_ts=as_of_ts,
+            start_ts=start_ts,
+            end_ts=end_ts,
+        )
+        if as_of is not None or start is not None or end is not None:
+            sql += " AND m.timestamp>0"
+        if as_of is not None:
+            sql += " AND m.timestamp<=?"
+            params.append(as_of)
+        else:
+            if start is not None:
+                sql += " AND m.timestamp>=?"
+                params.append(start)
+            if end is not None:
+                sql += " AND m.timestamp<=?"
+                params.append(end)
+        sql += " ORDER BY bm25(event_log_keyword_fts) ASC, m.timestamp DESC LIMIT ?"
+        params.append(max(120, int(top_k) * 20))
+        try:
+            rows = self.engine.query_all(sql, params)
+        except Exception:
+            return []
+        scored: dict[str, dict[str, Any]] = {}
+        for row in rows:
+            memory_id = str(row.get("memory_id", "")).strip()
+            if not memory_id:
+                continue
+            raw_text = str(row.get("fact_text", "")).lower()
+            term_hits = 0
+            lexical = 0.0
+            for term in core_terms:
+                count = float(raw_text.count(term))
+                lexical += count
+                if count > 0:
+                    term_hits += 1
+            if term_hits <= 0 and str(query or "").strip().lower() not in raw_text:
+                continue
+            coverage = float(term_hits) / float(max(1, len(core_terms)))
+            lexical_norm = min(1.0, float(lexical) / float(max(1, len(core_terms) * 2)))
+            bm25_raw = row.get("bm25_score")
+            try:
+                bm25_val = float(bm25_raw if bm25_raw is not None else 0.0)
+            except Exception:
+                bm25_val = 0.0
+            fts_score = 1.0 / (1.0 + max(0.0, bm25_val))
+            row_score = (
+                1.82 * float(coverage) + 0.70 * float(lexical_norm) + 0.95 * float(fts_score)
+            )
+            prev = scored.get(memory_id)
+            if prev is None:
+                scored[memory_id] = {
+                    "memory_id": memory_id,
+                    "bm25_score": bm25_val,
+                    "score": float(row_score),
+                    "source": "event_log_keyword_fts",
+                    "event_log_support_count": 1,
+                    "event_log_fact_hint": str(row.get("fact_text", ""))[:240],
+                }
+                continue
+            prev["event_log_support_count"] = int(prev.get("event_log_support_count", 1)) + 1
+            prev["score"] = max(float(prev.get("score", 0.0)), float(row_score)) + 0.03
+            prev["bm25_score"] = min(
+                float(prev.get("bm25_score", bm25_val)),
+                float(bm25_val),
+            )
+        out = list(scored.values())
+        out.sort(
+            key=lambda x: (
+                float(x.get("score", 0.0)),
+                float(x.get("event_log_support_count", 0)),
+                -float(x.get("bm25_score", 0.0)),
+            ),
+            reverse=True,
+        )
+        return out[: max(1, int(top_k))]
+
+    def _search_event_log_keyword_scan(
+        self,
+        *,
+        query: str,
+        user_id: str | None,
+        group_id: str | None,
+        top_k: int,
+        candidate_episode_ids: set[str] | None = None,
+        as_of_ts: int | None = None,
+        start_ts: int | None = None,
+        end_ts: int | None = None,
+    ) -> list[dict[str, Any]]:
+        terms = self._tokenize_text(query)
+        if not terms:
+            terms = [query.lower()]
+        core_terms = list(dict.fromkeys(t for t in terms if t.strip()))
+        if not core_terms:
+            return []
+        sql = """
+            SELECT
+              e.memory_id,
+              e.fact,
+              m.timestamp
+            FROM memory_event_log e
+            JOIN episodic_memory m ON m.id = e.memory_id
+            WHERE m.is_deleted=0
+        """
+        params: list[Any] = []
+        if user_id:
+            sql += " AND m.user_id=?"
+            params.append(user_id)
+        if group_id:
+            sql += " AND m.group_id=?"
+            params.append(group_id)
+        if candidate_episode_ids is not None:
+            if not candidate_episode_ids:
+                return []
+            placeholders = ",".join("?" for _ in candidate_episode_ids)
+            sql += f" AND m.id IN ({placeholders})"
+            params.extend(list(candidate_episode_ids))
+        as_of, start, end = self._normalize_time_window(
+            as_of_ts=as_of_ts,
+            start_ts=start_ts,
+            end_ts=end_ts,
+        )
+        if as_of is not None or start is not None or end is not None:
+            sql += " AND m.timestamp>0"
+        if as_of is not None:
+            sql += " AND m.timestamp<=?"
+            params.append(as_of)
+        else:
+            if start is not None:
+                sql += " AND m.timestamp>=?"
+                params.append(start)
+            if end is not None:
+                sql += " AND m.timestamp<=?"
+                params.append(end)
+        like_terms = core_terms[:8]
+        if like_terms:
+            clauses = []
+            for term in like_terms:
+                clauses.append("LOWER(e.fact) LIKE ?")
+                params.append(f"%{term}%")
+            sql += " AND (" + " OR ".join(clauses) + ")"
+        sql += " ORDER BY m.timestamp DESC, e.fact_order ASC LIMIT ?"
+        params.append(max(200, int(top_k) * 40))
+        try:
+            rows = self.engine.query_all(sql, params)
+        except Exception:
+            return []
+        scored: dict[str, dict[str, Any]] = {}
+        query_low = str(query or "").strip().lower()
+        for row in rows:
+            memory_id = str(row.get("memory_id", "")).strip()
+            if not memory_id:
+                continue
+            raw_text = str(row.get("fact", "")).lower()
+            term_hits = 0
+            lexical = 0.0
+            for term in core_terms:
+                count = float(raw_text.count(term))
+                lexical += count
+                if count > 0:
+                    term_hits += 1
+            if term_hits <= 0 and query_low not in raw_text:
+                continue
+            coverage = float(term_hits) / float(max(1, len(core_terms)))
+            lexical_norm = min(1.0, float(lexical) / float(max(1, len(core_terms) * 2)))
+            row_score = 1.88 * float(coverage) + 0.78 * float(lexical_norm)
+            prev = scored.get(memory_id)
+            if prev is None:
+                scored[memory_id] = {
+                    "memory_id": memory_id,
+                    "bm25_score": float(row_score),
+                    "score": float(row_score),
+                    "source": "event_log_keyword_scan",
+                    "event_log_support_count": 1,
+                    "event_log_fact_hint": str(row.get("fact", ""))[:240],
+                }
+                continue
+            prev["event_log_support_count"] = int(prev.get("event_log_support_count", 1)) + 1
+            prev["score"] = max(float(prev.get("score", 0.0)), float(row_score)) + 0.02
+        out = list(scored.values())
+        out.sort(
+            key=lambda x: (
+                float(x.get("score", 0.0)),
+                float(x.get("event_log_support_count", 0)),
+            ),
+            reverse=True,
+        )
+        return out[: max(1, int(top_k))]
+
+    def _search_foresight_keyword_fts(
+        self,
+        *,
+        query: str,
+        user_id: str | None,
+        group_id: str | None,
+        top_k: int,
+        candidate_episode_ids: set[str] | None = None,
+        as_of_ts: int | None = None,
+        start_ts: int | None = None,
+        end_ts: int | None = None,
+    ) -> list[dict[str, Any]]:
+        terms = self._tokenize_text(query)
+        if not terms:
+            terms = [query.lower()]
+        dedup_terms = list(dict.fromkeys(t for t in terms if t.strip()))
+        if not dedup_terms:
+            return []
+        selected = dedup_terms[:24]
+        core_terms = list(selected)
+        match_query = " OR ".join(f'"{self._escape_fts_term(t)}"' for t in selected)
+        sql = """
+            SELECT
+              idx.memory_id AS memory_id,
+              idx.foresight_text AS foresight_text,
+              bm25(foresight_keyword_fts) AS bm25_score
+            FROM foresight_keyword_fts idx
+            JOIN episodic_memory m ON m.id = idx.memory_id
+            WHERE foresight_keyword_fts MATCH ?
+              AND m.is_deleted=0
+        """
+        params: list[Any] = [match_query]
+        if user_id:
+            sql += " AND m.user_id=?"
+            params.append(user_id)
+        if group_id:
+            sql += " AND m.group_id=?"
+            params.append(group_id)
+        if candidate_episode_ids is not None:
+            if not candidate_episode_ids:
+                return []
+            placeholders = ",".join("?" for _ in candidate_episode_ids)
+            sql += f" AND m.id IN ({placeholders})"
+            params.extend(list(candidate_episode_ids))
+        as_of, start, end = self._normalize_time_window(
+            as_of_ts=as_of_ts,
+            start_ts=start_ts,
+            end_ts=end_ts,
+        )
+        if as_of is not None or start is not None or end is not None:
+            sql += " AND m.timestamp>0"
+        if as_of is not None:
+            sql += " AND m.timestamp<=?"
+            params.append(as_of)
+        else:
+            if start is not None:
+                sql += " AND m.timestamp>=?"
+                params.append(start)
+            if end is not None:
+                sql += " AND m.timestamp<=?"
+                params.append(end)
+        sql += " ORDER BY bm25(foresight_keyword_fts) ASC, m.timestamp DESC LIMIT ?"
+        params.append(max(120, int(top_k) * 20))
+        try:
+            rows = self.engine.query_all(sql, params)
+        except Exception:
+            return []
+        scored: dict[str, dict[str, Any]] = {}
+        for row in rows:
+            memory_id = str(row.get("memory_id", "")).strip()
+            if not memory_id:
+                continue
+            raw_text = str(row.get("foresight_text", "")).lower()
+            term_hits = 0
+            lexical = 0.0
+            for term in core_terms:
+                count = float(raw_text.count(term))
+                lexical += count
+                if count > 0:
+                    term_hits += 1
+            if term_hits <= 0 and str(query or "").strip().lower() not in raw_text:
+                continue
+            coverage = float(term_hits) / float(max(1, len(core_terms)))
+            lexical_norm = min(1.0, float(lexical) / float(max(1, len(core_terms) * 2)))
+            bm25_raw = row.get("bm25_score")
+            try:
+                bm25_val = float(bm25_raw if bm25_raw is not None else 0.0)
+            except Exception:
+                bm25_val = 0.0
+            fts_score = 1.0 / (1.0 + max(0.0, bm25_val))
+            row_score = 1.80 * float(coverage) + 0.68 * float(lexical_norm) + 0.90 * float(
+                fts_score
+            )
+            prev = scored.get(memory_id)
+            if prev is None:
+                scored[memory_id] = {
+                    "memory_id": memory_id,
+                    "bm25_score": bm25_val,
+                    "score": float(row_score),
+                    "source": "foresight_keyword_fts",
+                    "foresight_support_count": 1,
+                    "foresight_text_hint": str(row.get("foresight_text", ""))[:240],
+                }
+                continue
+            prev["foresight_support_count"] = int(prev.get("foresight_support_count", 1)) + 1
+            prev["score"] = max(float(prev.get("score", 0.0)), float(row_score)) + 0.03
+            prev["bm25_score"] = min(float(prev.get("bm25_score", bm25_val)), float(bm25_val))
+        out = list(scored.values())
+        out.sort(
+            key=lambda x: (
+                float(x.get("score", 0.0)),
+                float(x.get("foresight_support_count", 0)),
+                -float(x.get("bm25_score", 0.0)),
+            ),
+            reverse=True,
+        )
+        return out[: max(1, int(top_k))]
+
+    def _search_foresight_keyword_scan(
+        self,
+        *,
+        query: str,
+        user_id: str | None,
+        group_id: str | None,
+        top_k: int,
+        candidate_episode_ids: set[str] | None = None,
+        as_of_ts: int | None = None,
+        start_ts: int | None = None,
+        end_ts: int | None = None,
+    ) -> list[dict[str, Any]]:
+        terms = self._tokenize_text(query)
+        if not terms:
+            terms = [query.lower()]
+        core_terms = list(dict.fromkeys(t for t in terms if t.strip()))
+        if not core_terms:
+            return []
+        sql = """
+            SELECT
+              f.memory_id,
+              f.content AS foresight_text,
+              m.timestamp
+            FROM memory_foresight f
+            JOIN episodic_memory m ON m.id = f.memory_id
+            WHERE m.is_deleted=0
+        """
+        params: list[Any] = []
+        if user_id:
+            sql += " AND m.user_id=?"
+            params.append(user_id)
+        if group_id:
+            sql += " AND m.group_id=?"
+            params.append(group_id)
+        if candidate_episode_ids is not None:
+            if not candidate_episode_ids:
+                return []
+            placeholders = ",".join("?" for _ in candidate_episode_ids)
+            sql += f" AND m.id IN ({placeholders})"
+            params.extend(list(candidate_episode_ids))
+        as_of, start, end = self._normalize_time_window(
+            as_of_ts=as_of_ts,
+            start_ts=start_ts,
+            end_ts=end_ts,
+        )
+        if as_of is not None or start is not None or end is not None:
+            sql += " AND m.timestamp>0"
+        if as_of is not None:
+            sql += " AND m.timestamp<=?"
+            params.append(as_of)
+        else:
+            if start is not None:
+                sql += " AND m.timestamp>=?"
+                params.append(start)
+            if end is not None:
+                sql += " AND m.timestamp<=?"
+                params.append(end)
+        like_terms = core_terms[:8]
+        if like_terms:
+            clauses = []
+            for term in like_terms:
+                clauses.append("LOWER(f.content) LIKE ?")
+                params.append(f"%{term}%")
+            sql += " AND (" + " OR ".join(clauses) + ")"
+        sql += " ORDER BY m.timestamp DESC LIMIT ?"
+        params.append(max(200, int(top_k) * 40))
+        try:
+            rows = self.engine.query_all(sql, params)
+        except Exception:
+            return []
+        scored: dict[str, dict[str, Any]] = {}
+        query_low = str(query or "").strip().lower()
+        for row in rows:
+            memory_id = str(row.get("memory_id", "")).strip()
+            if not memory_id:
+                continue
+            raw_text = str(row.get("foresight_text", "")).lower()
+            term_hits = 0
+            lexical = 0.0
+            for term in core_terms:
+                count = float(raw_text.count(term))
+                lexical += count
+                if count > 0:
+                    term_hits += 1
+            if term_hits <= 0 and query_low not in raw_text:
+                continue
+            coverage = float(term_hits) / float(max(1, len(core_terms)))
+            lexical_norm = min(1.0, float(lexical) / float(max(1, len(core_terms) * 2)))
+            row_score = 1.78 * float(coverage) + 0.74 * float(lexical_norm)
+            prev = scored.get(memory_id)
+            if prev is None:
+                scored[memory_id] = {
+                    "memory_id": memory_id,
+                    "bm25_score": float(row_score),
+                    "score": float(row_score),
+                    "source": "foresight_keyword_scan",
+                    "foresight_support_count": 1,
+                    "foresight_text_hint": str(row.get("foresight_text", ""))[:240],
+                }
+                continue
+            prev["foresight_support_count"] = int(prev.get("foresight_support_count", 1)) + 1
+            prev["score"] = max(float(prev.get("score", 0.0)), float(row_score)) + 0.02
+        out = list(scored.values())
+        out.sort(
+            key=lambda x: (
+                float(x.get("score", 0.0)),
+                float(x.get("foresight_support_count", 0)),
+            ),
+            reverse=True,
+        )
+        return out[: max(1, int(top_k))]
+
+    @staticmethod
+    def _merge_ranked_hit_lists(
+        *,
+        primary: list[dict[str, Any]],
+        secondary: list[dict[str, Any]],
+        top_k: int,
+        primary_name: str,
+        secondary_name: str,
+    ) -> list[dict[str, Any]]:
+        if not primary and not secondary:
+            return []
+        if primary and not secondary:
+            return primary[: max(1, int(top_k))]
+        if secondary and not primary:
+            return secondary[: max(1, int(top_k))]
+        score_map: dict[str, dict[str, Any]] = {}
+        primary_rank: dict[str, int] = {}
+        secondary_rank: dict[str, int] = {}
+        for idx, row in enumerate(primary, start=1):
+            memory_id = str(row.get("memory_id", "")).strip()
+            if not memory_id:
+                continue
+            primary_rank[memory_id] = idx
+            item = dict(row)
+            item["merge_sources"] = [primary_name]
+            score_map[memory_id] = item
+        for idx, row in enumerate(secondary, start=1):
+            memory_id = str(row.get("memory_id", "")).strip()
+            if not memory_id:
+                continue
+            secondary_rank[memory_id] = idx
+            existing = score_map.get(memory_id)
+            if existing is None:
+                item = dict(row)
+                item["merge_sources"] = [secondary_name]
+                score_map[memory_id] = item
+                continue
+            sources = list(existing.get("merge_sources", []))
+            if secondary_name not in sources:
+                sources.append(secondary_name)
+            existing["merge_sources"] = sources
+            if not existing.get("event_log_fact_hint") and row.get("event_log_fact_hint"):
+                existing["event_log_fact_hint"] = row.get("event_log_fact_hint")
+            support_count = int(existing.get("event_log_support_count", 0)) + int(
+                row.get("event_log_support_count", 0)
+            )
+            if support_count > 0:
+                existing["event_log_support_count"] = support_count
+        rank_bias = 12.0
+        for memory_id, item in score_map.items():
+            p_rank = primary_rank.get(memory_id)
+            s_rank = secondary_rank.get(memory_id)
+            merged_score = 0.0
+            if p_rank is not None:
+                merged_score += 1.0 / float(rank_bias + p_rank)
+            if s_rank is not None:
+                merged_score += 0.58 / float(rank_bias + s_rank)
+            if p_rank is not None and s_rank is not None:
+                merged_score += 0.02
+            item["score"] = float(merged_score)
+        merged = list(score_map.values())
+        merged.sort(
+            key=lambda x: (
+                float(x.get("score", 0.0)),
+                1 if primary_name in list(x.get("merge_sources", [])) else 0,
+                len(list(x.get("merge_sources", []))),
+            ),
+            reverse=True,
+        )
+        return merged[: max(1, int(top_k))]
+
+    @staticmethod
+    def _normalize_time_window(
+        *,
+        as_of_ts: int | None,
+        start_ts: int | None,
+        end_ts: int | None,
+    ) -> tuple[int | None, int | None, int | None]:
+        as_of = int(as_of_ts) if as_of_ts is not None else None
+        start = int(start_ts) if start_ts is not None else None
+        end = int(end_ts) if end_ts is not None else None
+        if as_of is not None and as_of <= 0:
+            as_of = None
+        if start is not None and start <= 0:
+            start = None
+        if end is not None and end <= 0:
+            end = None
+        if as_of is not None:
+            return as_of, None, None
+        if start is not None and end is not None and start > end:
+            start, end = end, start
+        return None, start, end
+
     @staticmethod
     def _tokenize_text(text: str) -> list[str]:
         raw = str(text or "").lower().strip()
@@ -428,7 +1307,107 @@ class MemoryRepository:
             tokens.append(chars[i] + chars[i + 1])
         if chars:
             tokens.append("".join(chars))
-        stop = {"我", "你", "他", "她", "它", "吗", "呢", "啊", "呀", "的", "了"}
+        stop = {
+            "我",
+            "你",
+            "他",
+            "她",
+            "它",
+            "吗",
+            "呢",
+            "啊",
+            "呀",
+            "的",
+            "了",
+            "what",
+            "when",
+            "where",
+            "which",
+            "who",
+            "whom",
+            "whose",
+            "why",
+            "how",
+            "is",
+            "are",
+            "am",
+            "was",
+            "were",
+            "be",
+            "been",
+            "being",
+            "do",
+            "does",
+            "did",
+            "done",
+            "can",
+            "could",
+            "would",
+            "should",
+            "will",
+            "shall",
+            "may",
+            "might",
+            "must",
+            "to",
+            "of",
+            "in",
+            "on",
+            "at",
+            "for",
+            "by",
+            "with",
+            "about",
+            "from",
+            "as",
+            "into",
+            "through",
+            "after",
+            "before",
+            "up",
+            "down",
+            "over",
+            "under",
+            "again",
+            "further",
+            "then",
+            "once",
+            "the",
+            "a",
+            "an",
+            "and",
+            "or",
+            "but",
+            "if",
+            "because",
+            "while",
+            "this",
+            "that",
+            "these",
+            "those",
+            "it",
+            "its",
+            "i",
+            "you",
+            "he",
+            "she",
+            "they",
+            "we",
+            "me",
+            "him",
+            "her",
+            "them",
+            "my",
+            "your",
+            "his",
+            "their",
+            "our",
+            "mine",
+            "yours",
+            "hers",
+            "theirs",
+            "ours",
+        }
         return [t for t in tokens if t and t not in stop]
 
     @staticmethod
@@ -869,6 +1848,20 @@ class MemoryRepository:
                 )
             except Exception:
                 pass
+            try:
+                self.engine.execute(
+                    "DELETE FROM event_log_keyword_fts WHERE memory_id=?",
+                    (memory_id,),
+                )
+            except Exception:
+                pass
+            try:
+                self.engine.execute(
+                    "DELETE FROM foresight_keyword_fts WHERE memory_id=?",
+                    (memory_id,),
+                )
+            except Exception:
+                pass
         return affected
 
     def _sync_keyword_index(
@@ -909,6 +1902,62 @@ class MemoryRepository:
                 VALUES(?,?,?,?)
                 """,
                 (memory_id, user_id, str(group_id or ""), search_text),
+            )
+        except Exception:
+            return
+
+    def _sync_event_log_keyword_index(self, *, memory_id: str) -> None:
+        mid = str(memory_id or "").strip()
+        if not mid:
+            return
+        try:
+            self.engine.execute(
+                "DELETE FROM event_log_keyword_fts WHERE memory_id=?",
+                (mid,),
+            )
+            self.engine.execute(
+                """
+                INSERT INTO event_log_keyword_fts(event_log_id,memory_id,user_id,group_id,fact_text)
+                SELECT
+                  CAST(e.id AS TEXT),
+                  e.memory_id,
+                  e.user_id,
+                  COALESCE(e.group_id, ''),
+                  trim(COALESCE(e.fact, ''))
+                FROM memory_event_log e
+                WHERE e.memory_id=?
+                  AND COALESCE(trim(e.fact), '')<>''
+                """,
+                (mid,),
+            )
+        except Exception:
+            return
+
+    def _sync_foresight_keyword_index(self, *, memory_id: str) -> None:
+        mid = str(memory_id or "").strip()
+        if not mid:
+            return
+        try:
+            self.engine.execute(
+                "DELETE FROM foresight_keyword_fts WHERE memory_id=?",
+                (mid,),
+            )
+            self.engine.execute(
+                """
+                INSERT INTO foresight_keyword_fts(foresight_id,memory_id,user_id,group_id,foresight_text)
+                SELECT
+                  CAST(f.id AS TEXT),
+                  f.memory_id,
+                  m.user_id,
+                  COALESCE(m.group_id, ''),
+                  trim(COALESCE(f.content, ''))
+                FROM memory_foresight f
+                JOIN episodic_memory m ON m.id = f.memory_id
+                WHERE f.memory_id=?
+                  AND m.is_deleted=0
+                  AND COALESCE(trim(f.content), '')<>''
+                """,
+                (mid,),
             )
         except Exception:
             return

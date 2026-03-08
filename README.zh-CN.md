@@ -1,4 +1,4 @@
-# MiniMem（中文）
+# <img src="https://raw.githubusercontent.com/gengxy1216/MiniMem/main/docs/assets/minimem-icon.svg" alt="MiniMem logo" width="32" /> MiniMem（中文）
 
 [English](README.md) | 简体中文
 
@@ -38,7 +38,7 @@ MiniMem 不只是单个助手的“记忆库”，而是面向协作系统的记
 `pip`：
 
 ```bash
-pip install minimem
+pip install minimem-agent
 minimem
 ```
 

@@ -9,7 +9,7 @@ from evermemos_lite.domain.policy import EffectivePolicy
 from evermemos_lite.infra.sqlite.db import SQLiteEngine
 from evermemos_lite.infra.sqlite.init_schema import init_schema
 from evermemos_lite.service.memory_service import MemoryService
-from evermemos_lite.service.query_rewriter import QueryExpansionDecision
+from evermemos_lite.service.query_rewriter import HyDEDecision, QueryExpansionDecision
 
 
 class _NoopVectorStore:
@@ -52,6 +52,29 @@ class _StubExpandingRewriter:
     ) -> QueryExpansionDecision | None:
         self.calls += 1
         return self.decision
+
+
+class _StubHyDERewriter(_StubExpandingRewriter):
+    def __init__(
+        self,
+        *,
+        expansion_decision: QueryExpansionDecision | None = None,
+        hyde_decision: HyDEDecision | None = None,
+    ) -> None:
+        super().__init__(expansion_decision)
+        self.hyde_decision = hyde_decision
+        self.hyde_calls = 0
+
+    def generate_hyde_documents(
+        self,
+        *,
+        query: str,
+        hits: list[dict],
+        insufficiency_reason: str,
+        max_docs: int = 1,
+    ) -> HyDEDecision | None:
+        self.hyde_calls += 1
+        return self.hyde_decision
 
 
 class PhaseFourReasoningTests(unittest.TestCase):
@@ -256,6 +279,57 @@ class PhaseFourReasoningTests(unittest.TestCase):
             end_ts=None,
         )
         self.assertEqual("m-expanded", str(rows[0].get("id")))
+
+    def test_hyde_query_is_included_when_confident(self) -> None:
+        rewriter = _StubHyDERewriter(
+            expansion_decision=None,
+            hyde_decision=HyDEDecision(
+                documents=["假设证据：预算超支来自关键路径延迟"],
+                confidence=0.92,
+                reason="hyde",
+            ),
+        )
+        service = self._build_service(query_rewriter=rewriter)
+        calls: list[str] = []
+
+        def _fake_basic_search(
+            policy,
+            query,
+            user_id,
+            group_id,
+            top_k,
+            candidate_episode_ids,
+            attach_foresight=True,
+            **kwargs,
+        ):
+            calls.append(str(query))
+            return [
+                {
+                    "id": f"id:{query}",
+                    "score": 0.55,
+                    "summary": str(query),
+                    "timestamp": int(time.time()),
+                }
+            ]
+
+        service._basic_search = _fake_basic_search
+        rows = service._run_agentic_second_round(
+            policy=self._policy(),
+            original_query="项目为什么延期",
+            rewritten_query="项目为什么延期",
+            first_round_hits=[{"id": "m0", "summary": "延期风险"}],
+            insufficiency_reason="missing_cause",
+            user_id="u1",
+            group_id="g1",
+            top_k=4,
+            candidate_episode_ids=None,
+            as_of_ts=None,
+            start_ts=None,
+            end_ts=None,
+        )
+        self.assertGreaterEqual(rewriter.hyde_calls, 1)
+        self.assertTrue(any("假设证据" in q for q in calls))
+        self.assertGreaterEqual(len(rows), 1)
 
 
 if __name__ == "__main__":

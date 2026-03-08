@@ -1197,8 +1197,8 @@ export default function minimemOpenclawPlugin(api: any) {
 
   if (typeof api.on === "function") {
     api.on("before_agent_start", async (event: any) => {
+      const cfg = currentConfig();
       try {
-        const cfg = currentConfig();
         if (!cfg.autoInjectOnStart) {
           return;
         }
@@ -1267,8 +1267,8 @@ export default function minimemOpenclawPlugin(api: any) {
 
   if (typeof api.on === "function") {
     api.on("agent_end", async (event: any) => {
+      const cfg = currentConfig();
       try {
-        const cfg = currentConfig();
         if (!cfg.autoCaptureOnEnd) {
           return;
         }

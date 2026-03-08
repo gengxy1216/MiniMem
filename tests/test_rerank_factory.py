@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from evermemos_lite.config.settings import LiteSettings
+from evermemos_lite.service.chat_model_rerank import ChatModelRerankProvider
 from evermemos_lite.service.local_rerank import LocalHeuristicRerankProvider
 from evermemos_lite.service.openai_rerank import OpenAIRerankProvider
 from evermemos_lite.service.rerank_factory import build_rerank_provider
@@ -76,6 +77,29 @@ class RerankFactoryTests(unittest.TestCase):
                 runtime_model_config={"rerank_provider": "chat_model"},
             )
             self.assertIsNone(provider)
+
+    def test_chat_model_rerank_provider_is_enabled_with_credentials(self) -> None:
+        with WritableTempDir(ignore_cleanup_errors=True) as tmp:
+            env = {
+                "LITE_DATA_DIR": str(Path(tmp) / "mem-data"),
+                "LITE_CONFIG_DIR": str(Path(tmp) / "mem-config"),
+                "LITE_RERANK_PROVIDER": "chat_model",
+                "LITE_RERANK_BASE_URL": "https://chat.example/v1",
+                "LITE_RERANK_API_KEY": "rk",
+                "LITE_RERANK_MODEL": "qwen-rerank",
+            }
+            with patch.dict(os.environ, env, clear=True):
+                settings = LiteSettings.from_env()
+            provider = build_rerank_provider(
+                settings=settings,
+                runtime_model_config={
+                    "rerank_provider": "chat_model",
+                    "rerank_base_url": "https://chat.example/v1",
+                    "rerank_api_key": "rk",
+                    "rerank_model": "qwen-rerank",
+                },
+            )
+            self.assertIsInstance(provider, ChatModelRerankProvider)
 
 
 if __name__ == "__main__":

@@ -182,7 +182,7 @@ class AgenticVerifierTests(unittest.TestCase):
             group_id="g1",
             top_k=3,
         )
-        self.assertEqual(1, calls["count"])
+        self.assertGreaterEqual(calls["count"], 2)
         self.assertEqual(1, len(rows))
         self.assertEqual(1, verifier.calls)
 

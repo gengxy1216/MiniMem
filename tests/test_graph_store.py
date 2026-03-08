@@ -58,6 +58,34 @@ class GraphStorePersistenceTests(unittest.TestCase):
             neighbors = store.neighbors("李四", user_id="u1", group_id="g1", limit=10)
             self.assertTrue(all(n["group_id"] == "g1" for n in neighbors))
 
+    def test_search_respects_time_window(self) -> None:
+        with TemporaryDirectory() as tmp:
+            store = KuzuGraphStore(Path(tmp), enabled=True)
+            store.upsert_triples(
+                [Triple("李四", "likes", "茶")],
+                event_id="evt-old",
+                timestamp=1686758400,
+                user_id="u1",
+                group_id="g1",
+            )
+            store.upsert_triples(
+                [Triple("李四", "likes", "咖啡")],
+                event_id="evt-new",
+                timestamp=1736611200,
+                user_id="u1",
+                group_id="g1",
+            )
+            hits = store.search(
+                "李四 喜欢",
+                user_id="u1",
+                group_id="g1",
+                limit=10,
+                start_ts=1672531200,
+                end_ts=1704067199,
+            )
+            self.assertEqual(1, len(hits))
+            self.assertEqual("evt-old", str(hits[0].get("event_id")))
+
     def test_load_ignores_corrupted_lines(self) -> None:
         with TemporaryDirectory() as tmp:
             base = Path(tmp)

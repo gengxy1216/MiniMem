@@ -22,6 +22,13 @@ class QueryExpansionDecision:
     reason: str
 
 
+@dataclass(frozen=True)
+class HyDEDecision:
+    documents: list[str]
+    confidence: float
+    reason: str
+
+
 class QueryRewriterProtocol(Protocol):
     def rewrite(self, *, query: str, hits: list[dict], insufficiency_reason: str) -> RewriteDecision | None:
         ...
@@ -145,6 +152,75 @@ class ChatModelQueryRewriter:
                 queries=queries,
                 confidence=max(0.0, min(1.0, _to_float(data.get("confidence"), default=0.0))),
                 reason=str(data.get("reason") or "").strip()[:80] or "llm_query_expand",
+            )
+        except Exception:
+            return None
+
+    def generate_hyde_documents(
+        self,
+        *,
+        query: str,
+        hits: list[dict],
+        insufficiency_reason: str,
+        max_docs: int = 1,
+    ) -> HyDEDecision | None:
+        if not self._enabled():
+            return None
+        cap = max(1, min(2, int(max_docs)))
+        compact_hits = []
+        for row in list(hits or [])[:5]:
+            if not isinstance(row, dict):
+                continue
+            compact_hits.append(
+                {
+                    "summary": str(row.get("summary", "")).strip()[:140],
+                    "subject": str(row.get("subject", "")).strip()[:80],
+                    "source": str(row.get("source", "")).strip()[:40],
+                    "timestamp": int(_to_float(row.get("timestamp"), default=0.0)),
+                }
+            )
+        payload = {
+            "query": str(query or "").strip()[:300],
+            "insufficiency_reason": str(insufficiency_reason or "").strip()[:120],
+            "hits": compact_hits,
+            "max_docs": cap,
+        }
+        messages = [
+            {
+                "role": "system",
+                "content": (
+                    "You generate hypothetical retrieval evidence passages (HyDE).\n"
+                    "Return strict JSON with keys: documents, confidence, reason.\n"
+                    "Rules: keep user intent unchanged; each document <= 220 chars; factual style."
+                ),
+            },
+            {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
+        ]
+        try:
+            raw = self._chat_completion(messages=messages)
+            data = _safe_json(raw)
+            raw_docs = data.get("documents")
+            if not isinstance(raw_docs, list):
+                return None
+            docs: list[str] = []
+            seen: set[str] = set()
+            for item in raw_docs:
+                doc = " ".join(str(item or "").strip().split())[:260]
+                if not doc:
+                    continue
+                key = doc.lower()
+                if key in seen:
+                    continue
+                seen.add(key)
+                docs.append(doc)
+                if len(docs) >= cap:
+                    break
+            if not docs:
+                return None
+            return HyDEDecision(
+                documents=docs,
+                confidence=max(0.0, min(1.0, _to_float(data.get("confidence"), default=0.0))),
+                reason=str(data.get("reason") or "").strip()[:80] or "llm_hyde",
             )
         except Exception:
             return None

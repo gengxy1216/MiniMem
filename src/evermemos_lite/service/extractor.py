@@ -8,6 +8,14 @@ from urllib import error, request
 
 from evermemos_lite.service.http_auth import build_auth_headers, normalize_api_key_token
 
+EXTRACT_INPUT_CHAR_CAP = 4000
+EXTRACT_SUMMARY_CHAR_CAP = 220
+EXTRACT_SUMMARY_HARD_CAP = 360
+EXTRACT_ATOMIC_FACT_MAX_ITEMS = 24
+EXTRACT_ATOMIC_FACT_MAX_CHARS = 160
+EXTRACT_MAX_TOKENS = 900
+EXTRACT_MAX_RETRIES = 2
+
 
 @dataclass(frozen=True)
 class ExtractedMemory:
@@ -48,34 +56,38 @@ class OpenAIMemoryExtractor:
     def extract(self, content: str, sender: str, group_id: str | None) -> ExtractedMemory:
         if self.client is None:
             return self._fallback.extract(content=content, sender=sender, group_id=group_id)
-        try:
-            episode = _markdown_to_plain(content).strip()
-            compact_input = episode[:1200]
-            prompt = (
-                "You are a memory extractor. Return strict JSON only, no markdown.\n"
-                "Fields: episode (string), summary (<=80 chars), subject (short), "
-                "importance_score (0~1), atomic_facts (1~8 items; each <=32 chars), "
-                "foresights (array), profile_patch (object string->string).\n"
-                "Split compound sentences into fine-grained facts. Keep output concise."
-            )
-            completion = self.client.chat.completions.create(
-                model=self.model,
-                response_format={"type": "json_object"},
-                messages=[
-                    {"role": "system", "content": prompt},
-                    {"role": "user", "content": compact_input},
-                ],
-                temperature=0.0,
-            )
-            raw = str(completion.choices[0].message.content or "").strip()
-            data = _safe_json(raw)
-            return _build_extracted_from_dict(data=data, episode=episode, sender=sender)
-        except Exception:
-            return self._fallback.extract(content=content, sender=sender, group_id=group_id)
+        episode = _markdown_to_plain(content).strip()
+        compact_input = episode[:EXTRACT_INPUT_CHAR_CAP]
+        prompt = (
+            "You are a memory extractor. Return strict JSON only, no markdown.\n"
+            f"Fields: episode (string), summary (<={EXTRACT_SUMMARY_CHAR_CAP} chars), subject (short), "
+            "importance_score (0~1), "
+            f"atomic_facts (1~{EXTRACT_ATOMIC_FACT_MAX_ITEMS} items; each <={EXTRACT_ATOMIC_FACT_MAX_CHARS} chars), "
+            "foresights (array), profile_patch (object string->string).\n"
+            "Preserve temporal order and named entities. Keep facts retrieval-oriented."
+        )
+        for _ in range(EXTRACT_MAX_RETRIES):
+            try:
+                completion = self.client.chat.completions.create(
+                    model=self.model,
+                    response_format={"type": "json_object"},
+                    messages=[
+                        {"role": "system", "content": prompt},
+                        {"role": "user", "content": compact_input},
+                    ],
+                    temperature=0.0,
+                    max_tokens=EXTRACT_MAX_TOKENS,
+                )
+                raw = str(completion.choices[0].message.content or "").strip()
+                data = _safe_json(raw)
+                return _build_extracted_from_dict(data=data, episode=episode, sender=sender)
+            except Exception:
+                continue
+        return self._fallback.extract(content=content, sender=sender, group_id=group_id)
 
 
 class ChatModelMemoryExtractor:
-    """Use runtime chat model as semantic extractor with strict compact output."""
+    """Use runtime chat model as semantic extractor with retrieval-oriented output."""
 
     def __init__(self, base_url: str, api_key: str, model: str) -> None:
         self.base_url = str(base_url or "").strip()
@@ -89,28 +101,33 @@ class ChatModelMemoryExtractor:
         episode = _markdown_to_plain(content).strip()
         if not episode:
             return self._fallback.extract(content=content, sender=sender, group_id=group_id)
-        compact_input = episode[:1200]
+        compact_input = episode[:EXTRACT_INPUT_CHAR_CAP]
         sys_prompt = (
-            "You extract memory into compact strict JSON only.\n"
+            "You extract memory into strict JSON only.\n"
             "Required keys: episode, summary, subject, importance_score, atomic_facts, foresights, profile_patch.\n"
-            "Rules: summary <= 80 chars; atomic_facts 1~8 items; each fact <= 32 chars; no explanation text."
+            f"Rules: summary <= {EXTRACT_SUMMARY_CHAR_CAP} chars; "
+            f"atomic_facts 1~{EXTRACT_ATOMIC_FACT_MAX_ITEMS} items; "
+            f"each fact <= {EXTRACT_ATOMIC_FACT_MAX_CHARS} chars; no explanation text.\n"
+            "Keep temporal and relation clues in atomic_facts."
         )
         user_prompt = (
             "Split this memory into fine-grained facts for retrieval.\n"
             f"Input:\n{compact_input}"
         )
-        try:
-            raw = self._chat_completion(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": sys_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
-            )
-            data = _safe_json(raw)
-            return _build_extracted_from_dict(data=data, episode=episode, sender=sender)
-        except Exception:
-            return self._fallback.extract(content=content, sender=sender, group_id=group_id)
+        for _ in range(EXTRACT_MAX_RETRIES):
+            try:
+                raw = self._chat_completion(
+                    model=self.model,
+                    messages=[
+                        {"role": "system", "content": sys_prompt},
+                        {"role": "user", "content": user_prompt},
+                    ],
+                )
+                data = _safe_json(raw)
+                return _build_extracted_from_dict(data=data, episode=episode, sender=sender)
+            except Exception:
+                continue
+        return self._fallback.extract(content=content, sender=sender, group_id=group_id)
 
     def _chat_completion(self, *, model: str, messages: list[dict[str, str]]) -> str:
         url = self._build_completion_url(self.base_url)
@@ -118,7 +135,7 @@ class ChatModelMemoryExtractor:
             "model": model,
             "messages": messages,
             "temperature": 0.0,
-            "max_tokens": 420,
+            "max_tokens": EXTRACT_MAX_TOKENS,
             "response_format": {"type": "json_object"},
         }
         req = request.Request(
@@ -192,8 +209,8 @@ def _build_extracted_from_dict(
     atomic_facts = _normalize_atomic_facts(data.get("atomic_facts"), normalized_episode)
     profile_patch = _normalize_profile_patch(data.get("profile_patch"))
     summary = str(data.get("summary") or _build_compact_summary(normalized_episode, atomic_facts)).strip()
-    if len(summary) > 200:
-        summary = summary[:200]
+    if len(summary) > EXTRACT_SUMMARY_HARD_CAP:
+        summary = summary[:EXTRACT_SUMMARY_HARD_CAP]
     subject = str(data.get("subject") or sender or "user").strip()[:60] or "user"
     try:
         imp = float(data.get("importance_score", -1.0))
@@ -254,9 +271,9 @@ def _estimate_importance(
 
 def _build_compact_summary(episode: str, atomic_facts: list[str]) -> str:
     if atomic_facts:
-        text = "；".join(atomic_facts[:4])
-        return text[:200]
-    return episode[:200]
+        text = "；".join(atomic_facts[:8])
+        return text[:EXTRACT_SUMMARY_HARD_CAP]
+    return episode[:EXTRACT_SUMMARY_HARD_CAP]
 
 
 def _extract_atomic_facts(content: str) -> list[str]:
@@ -271,13 +288,13 @@ def _extract_atomic_facts(content: str) -> list[str]:
         if not key or key in seen:
             continue
         seen.add(key)
-        out.append(key[:64])
-        if len(out) >= 8:
+        out.append(key[:EXTRACT_ATOMIC_FACT_MAX_CHARS])
+        if len(out) >= EXTRACT_ATOMIC_FACT_MAX_ITEMS:
             return out
 
     rough_parts = [
         p.strip()
-        for p in re.split(r"[。！？!?；;，,\n]+", text)
+        for p in re.split(r"[。！？!?；;，,\n]+|(?<!\d)\.(?!\d)", text)
         if p.strip()
     ]
     for raw in rough_parts:
@@ -290,10 +307,10 @@ def _extract_atomic_facts(content: str) -> list[str]:
         if cleaned in seen:
             continue
         seen.add(cleaned)
-        out.append(cleaned[:64])
-        if len(out) >= 8:
+        out.append(cleaned[:EXTRACT_ATOMIC_FACT_MAX_CHARS])
+        if len(out) >= EXTRACT_ATOMIC_FACT_MAX_ITEMS:
             break
-    return out[:8]
+    return out[:EXTRACT_ATOMIC_FACT_MAX_ITEMS]
 
 
 def _extract_structured_atomic_facts(text: str) -> list[str]:
@@ -367,7 +384,7 @@ def _extract_structured_atomic_facts(text: str) -> list[str]:
             continue
         seen.add(fact)
         normalized.append(fact)
-        if len(normalized) >= 8:
+        if len(normalized) >= EXTRACT_ATOMIC_FACT_MAX_ITEMS:
             break
     return normalized
 
@@ -409,7 +426,7 @@ def _extract_foresights(content: str) -> list[dict]:
     lower = content.lower()
     if not any(k in lower for k in ("明天", "下周", "deadline", "截止", "提醒", "todo", "计划")):
         return []
-    snippet = content.strip()[:200]
+    snippet = content.strip()[:EXTRACT_SUMMARY_HARD_CAP]
     return [{"content": snippet, "start_time": None, "end_time": None, "confidence": 0.62}]
 
 
@@ -441,12 +458,12 @@ def _normalize_atomic_facts(value, episode: str) -> list[str]:
             fact = str(x).strip()
             if not fact:
                 continue
-            fact = fact[:64]
+            fact = fact[:EXTRACT_ATOMIC_FACT_MAX_CHARS]
             if fact in seen:
                 continue
             seen.add(fact)
             out.append(fact)
-            if len(out) >= 8:
+            if len(out) >= EXTRACT_ATOMIC_FACT_MAX_ITEMS:
                 break
         if out:
             return out

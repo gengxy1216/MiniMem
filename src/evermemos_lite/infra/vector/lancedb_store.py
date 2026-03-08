@@ -38,6 +38,12 @@ class LanceVectorStore:
         "IVF_HNSW_SQ",
         "IVF_HNSW_PQ",
     }
+    INDEX_TYPE_ALIASES = {
+        "HNSW": "IVF_HNSW_PQ",
+        "HNSW_PQ": "IVF_HNSW_PQ",
+        "HNSW_SQ": "IVF_HNSW_SQ",
+        "IVF_HNSW": "IVF_HNSW_PQ",
+    }
 
     def __init__(
         self,
@@ -45,7 +51,7 @@ class LanceVectorStore:
         vector_dim: int,
         *,
         use_lancedb: bool = True,
-        lance_persist_min_importance: float = 0.72,
+        lance_persist_min_importance: float = 0.55,
         index_type: str = "IVF_HNSW_PQ",
         index_metric: str = "cosine",
         hnsw_m: int = 20,
@@ -69,6 +75,7 @@ class LanceVectorStore:
             0.0, min(1.0, float(lance_persist_min_importance))
         )
         index_key = str(index_type or "IVF_HNSW_PQ").strip().upper()
+        index_key = self.INDEX_TYPE_ALIASES.get(index_key, index_key)
         self._index_type = (
             index_key if index_key in self.SUPPORTED_INDEX_TYPES else "IVF_HNSW_PQ"
         )
@@ -114,7 +121,15 @@ class LanceVectorStore:
         user_id: str | None,
         group_id: str | None,
         candidate_episode_ids: set[str] | None = None,
+        as_of_ts: int | None = None,
+        start_ts: int | None = None,
+        end_ts: int | None = None,
     ) -> list[dict[str, Any]]:
+        as_of, start, end = self._normalize_time_window(
+            as_of_ts=as_of_ts,
+            start_ts=start_ts,
+            end_ts=end_ts,
+        )
         with self._lock:
             rows = list(self._rows.values())
             lance_table = self._lance_table if self.lance_enabled else None
@@ -125,6 +140,9 @@ class LanceVectorStore:
             user_id=user_id,
             group_id=group_id,
             candidate_episode_ids=candidate_episode_ids,
+            as_of_ts=as_of,
+            start_ts=start,
+            end_ts=end,
         )
         lance_hits = self._search_lancedb(
             table=lance_table,
@@ -133,6 +151,9 @@ class LanceVectorStore:
             user_id=user_id,
             group_id=group_id,
             candidate_episode_ids=candidate_episode_ids,
+            as_of_ts=as_of,
+            start_ts=start,
+            end_ts=end,
         )
         merged: dict[str, dict[str, Any]] = {}
         for row in [*in_mem_hits, *lance_hits]:
@@ -157,6 +178,9 @@ class LanceVectorStore:
         user_id: str | None,
         group_id: str | None,
         candidate_episode_ids: set[str] | None,
+        as_of_ts: int | None,
+        start_ts: int | None,
+        end_ts: int | None,
     ) -> list[dict[str, Any]]:
         limit = max(24, int(top_k) * 6)
         heap: list[tuple[float, int, dict[str, Any]]] = []
@@ -170,6 +194,19 @@ class LanceVectorStore:
             if group_id and meta.get("group_id") != group_id:
                 continue
             if candidate_episode_ids is not None and memory_id not in candidate_episode_ids:
+                continue
+            try:
+                ts = int(meta.get("timestamp", 0))
+            except Exception:
+                ts = 0
+            if as_of_ts is not None or start_ts is not None or end_ts is not None:
+                if ts <= 0:
+                    continue
+            if as_of_ts is not None and ts > as_of_ts:
+                continue
+            if start_ts is not None and ts < start_ts:
+                continue
+            if end_ts is not None and ts > end_ts:
                 continue
             sim = _cosine(vector, row["vector"])
             item = {
@@ -197,10 +234,19 @@ class LanceVectorStore:
         user_id: str | None,
         group_id: str | None,
         candidate_episode_ids: set[str] | None,
+        as_of_ts: int | None,
+        start_ts: int | None,
+        end_ts: int | None,
     ) -> list[dict[str, Any]]:
         if table is None:
             return []
-        expr = self._build_lancedb_filter(user_id=user_id, group_id=group_id)
+        expr = self._build_lancedb_filter(
+            user_id=user_id,
+            group_id=group_id,
+            as_of_ts=as_of_ts,
+            start_ts=start_ts,
+            end_ts=end_ts,
+        )
         limit = self._lancedb_query_limit(
             top_k=top_k, candidate_episode_ids=candidate_episode_ids
         )
@@ -415,16 +461,53 @@ class LanceVectorStore:
         return str(value).replace("'", "''")
 
     def _build_lancedb_filter(
-        self, *, user_id: str | None, group_id: str | None
+        self,
+        *,
+        user_id: str | None,
+        group_id: str | None,
+        as_of_ts: int | None,
+        start_ts: int | None,
+        end_ts: int | None,
     ) -> str | None:
         clauses: list[str] = []
         if user_id:
             clauses.append(f"user_id = '{self._quote_sql(user_id)}'")
         if group_id:
             clauses.append(f"group_id = '{self._quote_sql(group_id)}'")
+        if as_of_ts is not None or start_ts is not None or end_ts is not None:
+            clauses.append("timestamp > 0")
+        if as_of_ts is not None:
+            clauses.append(f"timestamp <= {int(as_of_ts)}")
+        else:
+            if start_ts is not None:
+                clauses.append(f"timestamp >= {int(start_ts)}")
+            if end_ts is not None:
+                clauses.append(f"timestamp <= {int(end_ts)}")
         if not clauses:
             return None
         return " AND ".join(clauses)
+
+    @staticmethod
+    def _normalize_time_window(
+        *,
+        as_of_ts: int | None,
+        start_ts: int | None,
+        end_ts: int | None,
+    ) -> tuple[int | None, int | None, int | None]:
+        as_of = int(as_of_ts) if as_of_ts is not None else None
+        start = int(start_ts) if start_ts is not None else None
+        end = int(end_ts) if end_ts is not None else None
+        if as_of is not None and as_of <= 0:
+            as_of = None
+        if start is not None and start <= 0:
+            start = None
+        if end is not None and end <= 0:
+            end = None
+        if as_of is not None:
+            return as_of, None, None
+        if start is not None and end is not None and start > end:
+            start, end = end, start
+        return None, start, end
 
     @staticmethod
     def _lancedb_query_limit(

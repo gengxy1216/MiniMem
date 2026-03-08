@@ -1,0 +1,2 @@
+[console_scripts]
+minimem = evermemos_lite.cli:main

@@ -41,6 +41,7 @@ class LiteSettings:
     lancedb_dir: Path
     graph_dir: Path
     retrieval_profile: str
+    recall_mode: bool
     request_status_ttl_sec: int
     nonce_ttl_sec: int
     openai_base_url: str
@@ -114,6 +115,10 @@ class LiteSettings:
     query_embed_cache_ttl_sec: int
     search_trace_enabled: bool
     search_trace_slow_ms: int
+    extract_max_retries: int
+    agentic_round_min_k: int
+    agentic_round_max_k: int
+    agentic_force_second_round: bool
 
     @classmethod
     def from_env(cls) -> "LiteSettings":
@@ -149,6 +154,7 @@ class LiteSettings:
             lancedb_dir=lancedb_dir,
             graph_dir=graph_dir,
             retrieval_profile=os.getenv("LITE_RETRIEVAL_PROFILE", "agentic"),
+            recall_mode=_env_bool("LITE_RECALL_MODE", False),
             request_status_ttl_sec=int(
                 os.getenv("LITE_REQUEST_STATUS_TTL_SEC", "3600")
             ),
@@ -179,7 +185,7 @@ class LiteSettings:
             ),
             embedding_provider=os.getenv("LITE_EMBEDDING_PROVIDER", "openai"),
             embedding_model=os.getenv(
-                "LITE_EMBEDDING_MODEL", "BAAI/bge-large-zh-v1.5"
+                "LITE_EMBEDDING_MODEL", "BAAI/bge-m3"
             ),
             local_embedding_model=os.getenv(
                 "LITE_LOCAL_EMBEDDING_MODEL", "local-hash-384"
@@ -205,7 +211,7 @@ class LiteSettings:
             extractor_model=os.getenv(
                 "LITE_EXTRACTOR_MODEL", "Qwen/Qwen3-235B-A22B-Instruct-2507"
             ),
-            rerank_provider=os.getenv("LITE_RERANK_PROVIDER", "chat_model"),
+            rerank_provider=os.getenv("LITE_RERANK_PROVIDER", "openai"),
             rerank_base_url=os.getenv(
                 "LITE_RERANK_BASE_URL",
                 os.getenv("LITE_CHAT_BASE_URL", "https://api.siliconflow.cn/v1"),
@@ -216,16 +222,21 @@ class LiteSettings:
             ),
             rerank_model=os.getenv(
                 "LITE_RERANK_MODEL",
-                os.getenv("LITE_CHAT_MODEL", "Qwen/Qwen3-8B"),
+                (
+                    os.getenv("LITE_CHAT_MODEL", "Qwen/Qwen3-8B")
+                    if str(os.getenv("LITE_RERANK_PROVIDER", "openai")).strip().lower()
+                    == "chat_model"
+                    else "BAAI/bge-reranker-v2-m3"
+                ),
             ),
             rerank_trigger_k=max(
-                2, int(os.getenv("LITE_RERANK_TRIGGER_K", "20"))
+                2, int(os.getenv("LITE_RERANK_TRIGGER_K", "12"))
             ),
             rerank_top_n=max(
-                1, int(os.getenv("LITE_RERANK_TOP_N", "20"))
+                1, int(os.getenv("LITE_RERANK_TOP_N", "80"))
             ),
             rerank_timeout_ms=max(
-                60, int(os.getenv("LITE_RERANK_TIMEOUT_MS", "220"))
+                60, int(os.getenv("LITE_RERANK_TIMEOUT_MS", "600"))
             ),
             local_rerank_model=os.getenv(
                 "LITE_LOCAL_RERANK_MODEL", "local-rerank-lexical-v1"
@@ -290,7 +301,7 @@ class LiteSettings:
                 min(1.0, float(os.getenv("LITE_PHASE4_TEMPORAL_RERANK_WEIGHT", "0.35"))),
             ),
             phase4_multi_hop_max_queries=max(
-                1, int(os.getenv("LITE_PHASE4_MULTI_HOP_MAX_QUERIES", "3"))
+                1, int(os.getenv("LITE_PHASE4_MULTI_HOP_MAX_QUERIES", "6"))
             ),
             agent_policy_provider=os.getenv("LITE_AGENT_POLICY_PROVIDER", "rule"),
             agent_policy_model=os.getenv(
@@ -307,10 +318,10 @@ class LiteSettings:
             ),
             vector_lancedb_enabled=_env_bool("LITE_VECTOR_LANCEDB_ENABLED", True),
             vector_lancedb_min_importance=float(
-                os.getenv("LITE_VECTOR_LANCEDB_MIN_IMPORTANCE", "0.72")
+                os.getenv("LITE_VECTOR_LANCEDB_MIN_IMPORTANCE", "0.55")
             ),
             vector_write_min_importance=float(
-                os.getenv("LITE_VECTOR_WRITE_MIN_IMPORTANCE", "0.30")
+                os.getenv("LITE_VECTOR_WRITE_MIN_IMPORTANCE", "0.10")
             ),
             vector_index_type=str(
                 os.getenv("LITE_VECTOR_INDEX_TYPE", "IVF_HNSW_PQ")
@@ -340,10 +351,10 @@ class LiteSettings:
                 1, int(os.getenv("LITE_VECTOR_EMBED_MAX_CHUNKS", "8"))
             ),
             search_budget_factor=max(
-                2, int(os.getenv("LITE_SEARCH_BUDGET_FACTOR", "4"))
+                2, int(os.getenv("LITE_SEARCH_BUDGET_FACTOR", "8"))
             ),
             search_min_probe_k=max(
-                4, int(os.getenv("LITE_SEARCH_MIN_PROBE_K", "12"))
+                4, int(os.getenv("LITE_SEARCH_MIN_PROBE_K", "24"))
             ),
             keyword_confident_best_score=float(
                 os.getenv("LITE_KEYWORD_CONFIDENT_BEST_SCORE", "9.0")
@@ -352,10 +363,10 @@ class LiteSettings:
                 os.getenv("LITE_KEYWORD_CONFIDENT_KTH_SCORE", "2.8")
             ),
             semantic_vector_budget_cap=max(
-                8, int(os.getenv("LITE_SEMANTIC_VECTOR_BUDGET_CAP", "32"))
+                8, int(os.getenv("LITE_SEMANTIC_VECTOR_BUDGET_CAP", "96"))
             ),
             semantic_keyword_budget_cap=max(
-                4, int(os.getenv("LITE_SEMANTIC_KEYWORD_BUDGET_CAP", "16"))
+                4, int(os.getenv("LITE_SEMANTIC_KEYWORD_BUDGET_CAP", "64"))
             ),
             query_embed_cache_size=max(
                 32, int(os.getenv("LITE_QUERY_EMBED_CACHE_SIZE", "256"))
@@ -366,6 +377,18 @@ class LiteSettings:
             search_trace_enabled=_env_bool("LITE_SEARCH_TRACE_ENABLED", False),
             search_trace_slow_ms=max(
                 0, int(os.getenv("LITE_SEARCH_TRACE_SLOW_MS", "0"))
+            ),
+            extract_max_retries=max(
+                1, int(os.getenv("LITE_EXTRACT_MAX_RETRIES", "3"))
+            ),
+            agentic_round_min_k=max(
+                8, int(os.getenv("LITE_AGENTIC_ROUND_MIN_K", "50"))
+            ),
+            agentic_round_max_k=max(
+                16, int(os.getenv("LITE_AGENTIC_ROUND_MAX_K", "180"))
+            ),
+            agentic_force_second_round=_env_bool(
+                "LITE_AGENTIC_FORCE_SECOND_ROUND", True
             ),
         )
 
